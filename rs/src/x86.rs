@@ -84,7 +84,7 @@ pub enum Ins {
     Call(String),
 
     /// Compare the value to register RAX
-    Cmp { r: Register, with: i64 },
+    Cmp { r: Register, with: Operand },
 
     /// x86 function preamble
     ///

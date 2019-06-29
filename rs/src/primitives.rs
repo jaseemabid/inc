@@ -34,45 +34,45 @@ pub fn dec(s: &mut State, x: &AST) -> ASM {
 pub fn fixnump(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
-        + Cmp { r: RAX, with: immediate::NUM }
-        + emit::cmp_bool()
+        + Cmp { r: RAX, with: Operand::Const(immediate::NUM) }
+        + to_bool("sete")
 }
 
 /// Is the expression a boolean?
 pub fn booleanp(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
-        + Cmp { r: RAX, with: immediate::BOOL }
-        + emit::cmp_bool()
+        + Cmp { r: RAX, with: Operand::Const(immediate::BOOL) }
+        + to_bool("sete")
 }
 
 /// Is the expression a char?
 pub fn charp(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
-        + Cmp { r: RAX, with: immediate::CHAR }
-        + emit::cmp_bool()
+        + Cmp { r: RAX, with: Operand::Const(immediate::CHAR) }
+        + to_bool("sete")
 }
 
 /// Is the expression null?
 pub fn nullp(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
-        + Cmp { r: RAX, with: immediate::NIL }
-        + emit::cmp_bool()
+        + Cmp { r: RAX, with: Operand::Const(immediate::NIL) }
+        + to_bool("sete")
 }
 
 /// Is the expression zero?
 pub fn zerop(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
-        + Cmp { r: RAX, with: immediate::NUM }
-        + emit::cmp_bool()
+        + Cmp { r: RAX, with: Operand::Const(immediate::NUM) }
+        + to_bool("sete")
 }
 
 /// Logical not
 pub fn not(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
-        + Cmp { r: RAX, with: immediate::FALSE }
-        + emit::cmp_bool()
+        + Cmp { r: RAX, with: Operand::Const(immediate::FALSE) }
+        + to_bool("sete")
 }
 
 // Binary Primitives
@@ -140,4 +140,50 @@ pub fn remainder(s: &mut State, x: &AST, y: &AST) -> ASM {
     div(s, x, y)
         + Mov { to: Reg(RAX), from: Reg(RDX) }
         + Sal { r: RAX, v: immediate::SHIFT }
+}
+
+// Comparators
+
+fn compare(s: &mut State, op: &str, x: &AST, y: &AST) -> ASM {
+    binop(s, x, y) + Cmp { r: RAX, with: Operand::Stack(s.si) } + to_bool(op)
+}
+
+/// Logical eq
+pub fn eq(s: &mut State, x: &AST, y: &AST) -> ASM {
+    compare(s, "sete", x, y)
+}
+
+/// Logical <
+pub fn lt(s: &mut State, x: &AST, y: &AST) -> ASM {
+    compare(s, "setl", x, y)
+}
+
+/// Logical >
+pub fn gt(s: &mut State, x: &AST, y: &AST) -> ASM {
+    compare(s, "setg", x, y)
+}
+
+/// Logical <=
+pub fn lte(s: &mut State, x: &AST, y: &AST) -> ASM {
+    compare(s, "setle", x, y)
+}
+
+/// Logical >=
+pub fn gte(s: &mut State, x: &AST, y: &AST) -> ASM {
+    compare(s, "setge", x, y)
+}
+
+/// Convert the result in RAX into a boolean
+pub fn to_bool(op: &str) -> ASM {
+    // SETE sets the destination operand to 0 or 1 depending on the settings
+    // of the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
+    (String::from(&format!("    {} al\n", op)) +
+
+     // MOVZX copies the contents of the source operand (register or
+     // memory location) to the destination operand (register) and zero
+     // extends the value.
+     "    movzx rax, al\n" +
+     &format!("    sal al, {}\n", immediate::SHIFT) +
+     &format!("    or al, {}\n", immediate::BOOL))
+        .into()
 }
