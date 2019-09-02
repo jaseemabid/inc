@@ -34,7 +34,7 @@ use crate::{
         Expr::{self, *},
         Expressions,
     },
-    x86::{self, Reference, Register::*, ASM, WORDSIZE},
+    x86::{self, Register::*, Relative, ASM, WORDSIZE},
 };
 
 use std::convert::TryInto;
@@ -125,9 +125,9 @@ pub fn code(s: &mut State, codes: Expressions) -> ASM {
             Lambda { name: Some(name), formals, body, .. } => {
                 asm += x86::func(name);
 
-                // Start a new lexical environment for the function, add the formal
-                // arguments and leave when it is evaluated. The first argument is
-                // available at `RSP - 8`, next at `RBP - 16` etc.
+                // Start a new lexical environment for the function, add the
+                // formal arguments and leave when it is evaluated. The first
+                // argument is available at `RBP - 8`, next at `RBP - 16` etc.
                 //
                 // TODO: `alloc()` and `dealloc()` doesn't understand `enter()` and
                 // `leave()`, so there is a fair bit of duplication here.
@@ -135,7 +135,11 @@ pub fn code(s: &mut State, codes: Expressions) -> ASM {
 
                 for (i, arg) in formals.iter().enumerate() {
                     let i: i64 = i.try_into().unwrap();
-                    s.set(&arg, Reference::from(-(i + 1) * WORDSIZE));
+                    s.set(
+                        &arg,
+                        Relative { register: RBP, offset: -(i + 1) * WORDSIZE }
+                            .into(),
+                    );
                 }
 
                 for b in body {
