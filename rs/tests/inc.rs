@@ -11,7 +11,7 @@ extern crate quickcheck;
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
 
-const test_folder: &str = "test_tmp";
+const TEST_FOLDER: &str = "test_tmp";
 
 // Step 1: Integers
 mod integers {
@@ -476,7 +476,7 @@ fn test_many(tests: &[(&str, &str)]) {
 
 // Run a single test, assert everything and cleanup afterwards
 fn test1(input: &str, output: &str) {
-    let base_folder = format!("{}/{:?}/", test_folder, Uuid::new_v4());
+    let base_folder = format!("{}/{:?}/", TEST_FOLDER, Uuid::new_v4());
     fs::create_dir_all(&base_folder).unwrap();
     fs::write(format!("{}/test.lisp", base_folder), input).unwrap();
 
