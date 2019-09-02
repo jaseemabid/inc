@@ -1,14 +1,10 @@
-FROM buildpack-deps:stretch
+FROM buildpack-deps:sid
 
 ENV RUSTUP_HOME=/usr/local/rustup \
   CARGO_HOME=/usr/local/cargo \
-  PATH=/usr/local/cargo/bin:$PATH \
-  RUST_VERSION=1.37.0
+  PATH=/usr/local/cargo/bin:$PATH
 
-RUN wget https://sh.rustup.rs -O /rustup.sh \
-  && chmod +x /rustup.sh \
-  && ./rustup.sh -y --no-modify-path --default-toolchain nightly \
-  && rm rustup.sh \
+RUN curl -s https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain nightly \
   && chmod -R a+w $RUSTUP_HOME $CARGO_HOME \
   && rustup --version \
   && cargo --version \
@@ -27,3 +23,8 @@ RUN mkdir /inc
 WORKDIR /inc
 ADD . /inc
 RUN cargo build --tests
+
+RUN export DEBIAN_FRONTEND=noninteractive && \
+    apt update && \
+    apt install -y gdb gdbserver && \
+    rm -rf /var/lib/apt/lists/*
