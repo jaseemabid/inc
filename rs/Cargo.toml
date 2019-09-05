@@ -10,10 +10,10 @@ categories  = []
 keywords    = ["compiler", "x86", "scheme"]
 
 [dependencies]
-nom = "^5.0"
 getopts = "0.2"
+nom = "^5.0"
 
 [dev-dependencies]
 quickcheck = "0.8"
 quickcheck_macros = "0.8"
-uuid = { version = "0.7", features = ["serde", "v4"] }
+rand = "0.7.0"
