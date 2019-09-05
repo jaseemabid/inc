@@ -8,6 +8,7 @@ use crate::{
 
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::Command;
 
 /// Parse the program and return an Expr
@@ -50,11 +51,10 @@ pub fn build(config: &Config) -> bool {
 
 /// Run the generated binary and return output
 pub fn run(config: &Config) -> Result<String, std::io::Error> {
-    let proc = Command::new(format!("./{}", &config.output))
-        .output()
-        .unwrap_or_else(|e| {
-            panic!("Failed to run binary `{}`; error: `{}`", &config.output, e)
-        });
+    let path = PathBuf::from(&config.output).canonicalize().unwrap();
+    let proc = Command::new(&path).output().unwrap_or_else(|e| {
+        panic!("Failed to run binary `{}`; error: `{}`", &path.display(), e)
+    });
 
     Ok(String::from_utf8(proc.stdout).unwrap().trim().to_string())
 }
