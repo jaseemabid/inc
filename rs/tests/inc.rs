@@ -403,8 +403,6 @@ mod functions {
     }
 
     #[test]
-    #[ignore]
-    // This function goes into some sort of ∞ loop
     fn two() {
         test1(
             "(let ((f (lambda () (+ 5 7)))
@@ -425,22 +423,10 @@ mod functions {
     fn recursive() {
         test1(
             "(let ((e (lambda (x) (if (zero? x) #t (o (dec x)))))
-                     (o (lambda (x) (if (zero? x) #f (e (dec x))))))
+                   (o (lambda (x) (if (zero? x) #f (e (dec x))))))
                 (e 25))",
             "#f",
-        )
-    }
-
-    #[test]
-    fn rest() {
-        test1(
-            "(let ((f (lambda (x y) (+ x y)))
-                      (g (lambda (x) (+ x 12))))
-                 (f 16 (f (g 0) (+ 1 (g 0)))))",
-            "41",
         );
-
-        test1("(let ((f (lambda (x) (g x x))) (g (lambda (x y) (+ x y)))) (f 12))", "24");
 
         test1(
             "(let ((f (lambda (x)
@@ -449,6 +435,21 @@ mod functions {
                               (* x (f (dec x))))))) (f 5))",
             "120",
         )
+    }
+
+    #[test]
+    fn nested() {
+        test1("(let ((f (lambda (x) (g x x))) (g (lambda (x y) (+ x y)))) (f 12))", "24");
+    }
+
+    #[test]
+    fn complex_args() {
+        test1(
+            "(let ((f (lambda (x y) (+ x y)))
+                   (g (lambda (x) (+ x 10))))
+               (f (g (g 5)) (g 0)))",
+            "35",
+        );
     }
 }
 
