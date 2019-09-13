@@ -183,7 +183,7 @@ pub fn and(r: Reference, v: Reference) -> Ins {
 
 /// Unconditional function call
 pub fn call(f: &str) -> Ins {
-    Ins(format!("call {}", f))
+    Ins(format!("call \"{}\"", f))
 }
 
 /// Compares the first source operand with the second source operand and sets
