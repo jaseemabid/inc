@@ -173,7 +173,7 @@ pub mod emit {
             Expr::{self, *},
             Expressions,
         },
-        immediate, lambda, primitives, strings,
+        immediate, lambda, primitives, runtime, strings,
         x86::{self, Ins, Register::*, Relative, ASM},
     };
 
@@ -264,8 +264,11 @@ pub mod emit {
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
-                // User defined functions
-                [Identifier(f), args @ ..] if s.functions.contains(f) => {
+                // User defined or runtime functions
+                [Identifier(f), args @ ..]
+                    if (s.functions.contains(f)
+                        || runtime::FUNCTIONS.contains(&&f.as_str())) =>
+                {
                     lambda::call(s, f, &Expressions(args.to_vec()))
                 }
 

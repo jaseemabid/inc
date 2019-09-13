@@ -40,6 +40,7 @@ pub fn build(config: &Config) -> bool {
         .arg("-fomit-frame-pointer")
         .arg("-fno-asynchronous-unwind-tables")
         .arg("-O0")
+        .arg("stdlib.s")
         .arg("runtime.c")
         .arg(&config.asm())
         .arg("-o")

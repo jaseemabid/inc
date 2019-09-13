@@ -375,6 +375,13 @@ mod strings {
 
         test_many(&tests)
     }
+
+    #[test]
+    fn runtime() {
+        test1("(string-length \"Hello world !!\")", "14");
+        test1("(string-length \"\")", "0");
+        test1("(string-length \"🐈\")", "4")
+    }
 }
 
 // Step 8 functions
