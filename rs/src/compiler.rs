@@ -174,7 +174,7 @@ pub mod emit {
             Expressions,
         },
         immediate, lambda, primitives, runtime, strings,
-        x86::{self, Ins, Register::*, Relative, ASM},
+        x86::{self, Ins, Reference, Register::*, Relative, ASM},
     };
 
     /// Clear (mask) all except the least significant 3 tag bits
@@ -196,7 +196,11 @@ pub mod emit {
         s.enter();
 
         for (name, expr) in vars {
-            asm += eval(s, expr) + x86::save(RAX.into(), s.si);
+            match immediate::to(expr) {
+                Some(c) => asm += x86::save(Reference::Const(c), s.si),
+                None => asm += eval(s, expr) + x86::save(RAX.into(), s.si),
+            }
+
             let r = Relative { register: RBP, offset: s.si };
             s.set(name, r.into());
         }
