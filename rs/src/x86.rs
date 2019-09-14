@@ -270,9 +270,9 @@ pub fn ret() -> Ins {
     Ins::from("ret")
 }
 
-/// Save a register `r` to stack at index `si`
+/// Save a reference `r` to stack at index `si`.
 pub fn save(r: Reference, si: i64) -> Ins {
-    Ins(format!("mov {}, {}", Register::RBP + si, r))
+    mov((Register::RBP + si).into(), r)
 }
 
 // Shift Operations fall into `arithmetic` (`SAR` & `SAL`) and `logical`
