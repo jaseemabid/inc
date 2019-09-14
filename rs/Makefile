@@ -25,7 +25,7 @@
 
 CCFLAGS = -g -ggdb3 -m64 -Wall -Wpedantic -Wno-override-module -fno-asynchronous-unwind-tables -fomit-frame-pointer
 
-inc: inc.s runtime.c
+inc: inc.s runtime.c stdlib.s
 	gcc $(CCFLAGS) $< -o inc
 
 .PHONY: test
