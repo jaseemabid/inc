@@ -190,11 +190,7 @@ pub mod emit {
     /// stays the same before and after a let expression. There is no need to
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
-    pub fn binding(
-        s: &mut State,
-        vars: &[(String, Expr)],
-        body: &[Expr],
-    ) -> ASM {
+    pub fn vars(s: &mut State, vars: &[(String, Expr)], body: &[Expr]) -> ASM {
         let mut asm = ASM(vec![]);
 
         s.enter();
@@ -259,7 +255,7 @@ pub mod emit {
             // Find the symbol index and return and reference in RAX
             Str(data) => strings::eval(&s, &data),
 
-            Let { bindings, body } => binding(s, bindings, body),
+            Let { bindings, body } => vars(s, bindings, body),
 
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
