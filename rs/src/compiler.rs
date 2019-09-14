@@ -303,7 +303,10 @@ pub mod emit {
                 _ => panic!("Unknown expression: `{}`", prog),
             },
 
-            _ => x86::mov(RAX.into(), immediate::to(&prog).into()).into(),
+            _ => match immediate::to(&prog) {
+                Some(c) => x86::mov(RAX.into(), c.into()).into(),
+                None => panic!("Unknown expression: `{}`", prog),
+            },
         }
     }
 

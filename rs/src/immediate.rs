@@ -32,37 +32,20 @@ pub const TRUE: i64 = (1 << SHIFT) | BOOL;
 /// function is partial. The caller for this function must make sure of it,
 /// rather than make this module complicated. It would be great if the type
 /// system could ensure that, but till then fail with a panic.
-pub fn to(prog: &Expr) -> i64 {
+pub fn to(prog: &Expr) -> Option<i64> {
     match prog {
-        Expr::Number(i) => (i << SHIFT) | NUM,
-        Expr::Boolean(true) => TRUE,
-        Expr::Boolean(false) => FALSE,
+        Expr::Number(i) => Some((i << SHIFT) | NUM),
+        Expr::Boolean(true) => Some(TRUE),
+        Expr::Boolean(false) => Some(FALSE),
         // An ASCII char is a single byte, so most of these shifts should be
         // OK. This is going to go wrong pretty badly with Unicode.
         Expr::Char(c) => {
             // Expand u8 to i64 before shifting right, this will easily
             // overflow and give bogus results otherwise. Unit testing FTW!
-            (i64::from(*c) << SHIFT) | CHAR
+            Some((i64::from(*c) << SHIFT) | CHAR)
         }
-        Expr::Nil => NIL,
-        Expr::Str(i) => {
-            unimplemented!("immediate repr is undefined for string {}", i)
-        }
-        Expr::Identifier(i) => {
-            unimplemented!("immediate repr is undefined for identifier {}", i)
-        }
-        Expr::List(..) => {
-            unimplemented!("immediate repr is undefined for lists")
-        }
-        Expr::Let { .. } => {
-            unimplemented!("immediate repr is undefined for let binding")
-        }
-        Expr::Cond { .. } => {
-            unimplemented!("immediate repr is undefined for a conditional")
-        }
-        Expr::Lambda { .. } => {
-            unimplemented!("immediate repr is undefined for a lambda")
-        }
+        Expr::Nil => Some(NIL),
+        _ => None,
     }
 }
 
@@ -101,8 +84,8 @@ mod tests {
 
     #[test]
     fn numbers() {
-        assert_eq!(to(&0.into()), 0);
-        assert_eq!(to(&1.into()), 8);
+        assert_eq!(to(&0.into()), Some(0));
+        assert_eq!(to(&1.into()), Some(8));
 
         assert_eq!(from(0), 0.into());
         assert_eq!(from(8), 1.into());
@@ -110,9 +93,6 @@ mod tests {
 
     #[test]
     fn chars() {
-        let expect = (65 << SHIFT) + CHAR;
-
-        assert_eq!(to(&('A').into()), expect);
-        assert_eq!(from(expect), 'A'.into());
+        assert_eq!(to(&('A').into()), Some((65 << SHIFT) + CHAR));
     }
 }
