@@ -27,11 +27,6 @@ pub const FALSE: i64 = (0 << SHIFT) | BOOL;
 pub const TRUE: i64 = (1 << SHIFT) | BOOL;
 
 /// Immediate representation of an expression.
-///
-/// Immediate representation is only defined for some types and this
-/// function is partial. The caller for this function must make sure of it,
-/// rather than make this module complicated. It would be great if the type
-/// system could ensure that, but till then fail with a panic.
 pub fn to(prog: &Expr) -> Option<i64> {
     match prog {
         Expr::Number(i) => Some((i << SHIFT) | NUM),
