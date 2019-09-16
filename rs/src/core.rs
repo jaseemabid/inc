@@ -90,9 +90,7 @@ impl fmt::Display for Expr {
             },
             Expr::Let { bindings, body } => {
                 write!(f, "(let (")?;
-                bindings
-                    .iter()
-                    .for_each(|(a, b)| write!(f, "({} {})", a, b).unwrap());
+                bindings.iter().for_each(|(a, b)| write!(f, "({} {})", a, b).unwrap());
                 write!(f, ") ")?;
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")

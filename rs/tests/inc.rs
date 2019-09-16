@@ -238,8 +238,7 @@ mod bindings {
 
         #[test]
         fn nested_scopes() {
-            let tests =
-                [("(let ((x (+ 1 2))) (let ((y (+ 3 4))) (+ x y)))", "10")];
+            let tests = [("(let ((x (+ 1 2))) (let ((y (+ 3 4))) (+ x y)))", "10")];
 
             for (inp, out) in tests.iter() {
                 test1(inp, out);
@@ -272,16 +271,10 @@ mod cond {
             ("(if #f 12 (if #f 13 4))", "4"),
             ("(if #\\X (if 1 2 3) (if 4 5 6))", "2"),
             ("(if (not (boolean? #t)) 15 (boolean? #f))", "#t"),
-            (
-                "(if (if (char? #\\a) (boolean? #\\b) (fixnum? #\\c)) 119 -23)",
-                "-23",
-            ),
+            ("(if (if (char? #\\a) (boolean? #\\b) (fixnum? #\\c)) 119 -23)", "-23"),
             ("(if (if (if (not 1) (not 2) (not 3)) 4 5) 6 7)", "6"),
             ("(if (not (if (if (not 1) (not 2) (not 3)) 4 5)) 6 7)", "7"),
-            (
-                "(not (if (not (if (if (not 1) (not 2) (not 3)) 4 5)) 6 7))",
-                "#f",
-            ),
+            ("(not (if (not (if (if (not 1) (not 2) (not 3)) 4 5)) 6 7))", "#f"),
             ("(if (char? 12) 13 14)", "14"),
             ("(if (char? #\\a) 13 14)", "13"),
             ("(inc (if (dec 1) (dec 13) 14))", "13"),
@@ -329,21 +322,24 @@ mod heap {
             ("(cdr (car (cons (cons 12 3) (cons #t #f))))", "3"),
             ("(car (cdr (cons (cons 12 3) (cons #t #f))))", "#t"),
             ("(cdr (cdr (cons (cons 12 3) (cons #t #f))))", "#f"),
-            ("(let
+            (
+                "(let
                  ((x (let
                         ((y (+ 1 2)))
                        (* y y))))
-                (cons x (+ x x)))", "(9 . 18)"),
-
-            ("(let ((t (cons 1 2))) (let ((t t)) (let ((t t)) (let ((t t)) t))))",  "(1 . 2)"),
-
+                (cons x (+ x x)))",
+                "(9 . 18)",
+            ),
+            ("(let ((t (cons 1 2))) (let ((t t)) (let ((t t)) (let ((t t)) t))))", "(1 . 2)"),
             ("(let ((t (let ((t (let ((t (let ((t (cons 1 2))) t))) t))) t))) t)", "(1 . 2)"),
-
-            ("(let ((x ()))
+            (
+                "(let ((x ()))
                 (let ((x (cons x x)))
                   (let ((x (cons x x)))
                     (let ((x (cons x x)))
-                      (cons x x)))))", "((((()) ()) (()) ()) ((()) ()) (()) ())")
+                      (cons x x)))))",
+                "((((()) ()) (()) ()) ((()) ()) (()) ())",
+            ),
         ];
 
         test_many(&tests)

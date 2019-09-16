@@ -28,23 +28,17 @@ pub fn dec(s: &mut State, x: &Expr) -> ASM {
 /// (fixnum? "hello") => #f
 /// ```
 pub fn fixnump(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(RAX.into(), immediate::NUM.into(), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX.into(), immediate::NUM.into(), "sete")
 }
 
 /// Is the expression a boolean?
 pub fn booleanp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(RAX.into(), immediate::BOOL.into(), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX.into(), immediate::BOOL.into(), "sete")
 }
 
 /// Is the expression a char?
 pub fn charp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(RAX.into(), immediate::CHAR.into(), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX.into(), immediate::CHAR.into(), "sete")
 }
 
 /// Is the expression null?
@@ -54,16 +48,12 @@ pub fn nullp(s: &mut State, expr: &Expr) -> ASM {
 
 /// Is the expression a pair?
 pub fn pairp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(RAX.into(), immediate::PAIR.into(), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX.into(), immediate::PAIR.into(), "sete")
 }
 
 /// Is the expression a string?
 pub fn stringp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(RAX.into(), immediate::STR.into(), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX.into(), immediate::STR.into(), "sete")
 }
 
 /// Is the expression zero?
@@ -147,9 +137,7 @@ pub fn quotient(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 
 /// Remainder after dividing `x` by `y`
 pub fn remainder(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    div(s, x, y)
-        + x86::mov(RAX.into(), RDX.into())
-        + x86::sal(RAX.into(), immediate::SHIFT.into())
+    div(s, x, y) + x86::mov(RAX.into(), RDX.into()) + x86::sal(RAX.into(), immediate::SHIFT.into())
 }
 
 /// Compares the first operand with the second with `SETcc`

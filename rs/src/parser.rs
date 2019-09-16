@@ -73,8 +73,7 @@ pub fn program(i: &str) -> IResult<&str, Vec<Expr>> {
 fn let_syntax(i: &str) -> IResult<&str, Expr> {
     let (i, _) = tuple((open, tag("let"), space1))(i)?;
     let (i, bindings) = delimited(open, many0(binding), close)(i)?;
-    let (i, body) =
-        delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
+    let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
     Ok((i, Expr::Let { bindings, body }))
@@ -116,23 +115,13 @@ fn binding(i: &str) -> IResult<&str, (String, Expr)> {
 /// <application> → (<expression> <expression>*)
 /// ```
 fn expression(i: &str) -> IResult<&str, Expr> {
-    alt((constant, variable, lambda_syntax, if_syntax, let_syntax, application))(
-        i,
-    )
+    alt((constant, variable, lambda_syntax, if_syntax, let_syntax, application))(i)
 }
 
 /// `(lambda <formals> <body>)`
 fn lambda_syntax(i: &str) -> IResult<&str, Expr> {
-    let (i, (_, _, _, formals, _, body, _, _)) = tuple((
-        open,
-        tag("lambda"),
-        space1,
-        formals,
-        space0,
-        body,
-        space0,
-        close,
-    ))(i)?;
+    let (i, (_, _, _, formals, _, body, _, _)) =
+        tuple((open, tag("lambda"), space1, formals, space0, body, space0, close))(i)?;
 
     Ok((i, Expr::Lambda { name: None, formals, body, free: vec![] }))
 }
@@ -193,13 +182,8 @@ fn constant(i: &str) -> IResult<&str, Expr> {
 
 /// `<application> → (<expression> <expression>*)`
 fn application(i: &str) -> IResult<&str, Expr> {
-    let (i, (_, a, _, mut b, _)) = tuple((
-        open,
-        expression,
-        space0,
-        many0(terminated(expression, space0)),
-        close,
-    ))(i)?;
+    let (i, (_, a, _, mut b, _)) =
+        tuple((open, expression, space0, many0(terminated(expression, space0)), close))(i)?;
 
     let mut v = vec![a];
     v.append(&mut b);
@@ -305,9 +289,7 @@ fn number(i: &str) -> IResult<&str, i64> {
     let (i, n) = digit1(i)?;
 
     // TODO: Propagate this error up rather than panic
-    let n = n
-        .parse::<i64>()
-        .expect(&format!("Failed to parse digits into i64: `{:?}`\n", n)[..]);
+    let n = n.parse::<i64>().expect(&format!("Failed to parse digits into i64: `{:?}`\n", n)[..]);
 
     Ok((i, s.unwrap_or(1) * n))
 }
@@ -440,14 +422,7 @@ mod tests {
         assert_eq!(ok(List(vec!["+".into(), 1.into()])), list("(+ 1)"));
 
         assert_eq!(
-            ok(List(vec![
-                1.into(),
-                2.into(),
-                3.into(),
-                "a".into(),
-                "b".into(),
-                "c".into()
-            ])),
+            ok(List(vec![1.into(), 2.into(), 3.into(), "a".into(), "b".into(), "c".into()])),
             list("(1 2 3 a b c)")
         );
 
@@ -462,17 +437,12 @@ mod tests {
 
     #[test]
     fn binary() {
-        assert_eq!(
-            ok(List(vec!["+".into(), "x".into(), 1776.into()])),
-            list("(+ x 1776)")
-        );
+        assert_eq!(ok(List(vec!["+".into(), "x".into(), 1776.into()])), list("(+ x 1776)"));
 
         assert_eq!(
-            ok(List(vec![
-                "+".into(),
-                "x".into(),
-                List(vec!["*".into(), "a".into(), "b".into()],),
-            ],)),
+            ok(List(
+                vec!["+".into(), "x".into(), List(vec!["*".into(), "a".into(), "b".into()],),],
+            )),
             list("(+ x (* a b))")
         );
     }
@@ -497,10 +467,7 @@ mod tests {
         let p2 = "(let ((x 1)) (let ((x 2)) #t) x)";
 
         let e1 = Let {
-            bindings: vec![
-                ("x".to_string(), Number(1)),
-                ("y".to_string(), Number(2)),
-            ],
+            bindings: vec![("x".to_string(), Number(1)), ("y".to_string(), Number(2))],
             body: vec![List(vec![
                 Identifier("+".to_string()),
                 Identifier("x".to_string()),
@@ -511,10 +478,7 @@ mod tests {
         let e2 = Let {
             bindings: vec![("x".to_string(), Number(1))],
             body: vec![
-                Let {
-                    bindings: vec![("x".to_string(), Number(2))],
-                    body: vec![true.into()],
-                },
+                Let { bindings: vec![("x".to_string(), Number(2))], body: vec![true.into()] },
                 Identifier("x".to_string()),
             ],
         };
@@ -522,13 +486,9 @@ mod tests {
         assert_eq!(ok(e1), super::let_syntax(p1));
         assert_eq!(ok(e2), super::let_syntax(p2));
 
-        assert!(program(
-            "(let ((x (let ((y (+ 1 2))) (* y y)))) (cons x (+ x x)))"
-        )
-        .is_ok());
+        assert!(program("(let ((x (let ((y (+ 1 2))) (* y y)))) (cons x (+ x x)))").is_ok());
 
-        assert!(program("(let ((x (let ((y 3)) (* y y)))) (cons x (+ x x)))")
-            .is_ok());
+        assert!(program("(let ((x (let ((y 3)) (* y y)))) (cons x (+ x x)))").is_ok());
     }
 
     #[test]
@@ -543,30 +503,20 @@ mod tests {
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(if #t 14)";
-        let exp = Cond {
-            pred: Box::new(Boolean(true)),
-            then: Box::new(Number(14)),
-            alt: None,
-        };
+        let exp = Cond { pred: Box::new(Boolean(true)), then: Box::new(Number(14)), alt: None };
 
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(if (zero? x) 1 (* x (f (dec x))))";
         let exp = Cond {
-            pred: Box::new(List(vec![
-                Identifier("zero?".into()),
-                Identifier("x".into()),
-            ])),
+            pred: Box::new(List(vec![Identifier("zero?".into()), Identifier("x".into())])),
             then: Box::new(Number(1)),
             alt: Some(Box::new(List(vec![
                 Identifier("*".into()),
                 Identifier("x".into()),
                 List(vec![
                     Identifier("f".into()),
-                    List(vec![
-                        Identifier("dec".into()),
-                        Identifier("x".into()),
-                    ]),
+                    List(vec![Identifier("dec".into()), Identifier("x".into())]),
                 ]),
             ]))),
         };
@@ -576,10 +526,7 @@ mod tests {
 
     #[test]
     fn application() {
-        assert_eq!(
-            ok(List(vec!["f".into(), "x".into()])),
-            super::application("(f x)")
-        );
+        assert_eq!(ok(List(vec!["f".into(), "x".into()])), super::application("(f x)"));
 
         assert_eq!(ok(List(vec!["f".into()])), super::application("(f)"));
     }
@@ -587,12 +534,7 @@ mod tests {
     #[test]
     fn lambda_syntax() {
         let prog = "(lambda () 1)";
-        let exp = Lambda {
-            name: None,
-            formals: vec![],
-            body: vec![Number(1)],
-            free: vec![],
-        };
+        let exp = Lambda { name: None, formals: vec![], body: vec![Number(1)], free: vec![] };
 
         assert_eq!(ok(vec![exp]), program(prog));
 
@@ -648,20 +590,14 @@ mod tests {
             formals: vec!["x".into()],
             free: vec![],
             body: vec![Cond {
-                pred: Box::new(List(vec![
-                    Identifier("zero?".into()),
-                    Identifier("x".into()),
-                ])),
+                pred: Box::new(List(vec![Identifier("zero?".into()), Identifier("x".into())])),
                 then: Box::new(Number(1)),
                 alt: Some(Box::new(List(vec![
                     Identifier("*".into()),
                     Identifier("x".into()),
                     List(vec![
                         Identifier("f".into()),
-                        List(vec![
-                            Identifier("dec".into()),
-                            Identifier("x".into()),
-                        ]),
+                        List(vec![Identifier("dec".into()), Identifier("x".into())]),
                     ]),
                 ]))),
             }],

@@ -14,10 +14,7 @@ use std::process::Command;
 /// Parse the program and return an Expr
 pub fn parse(config: &Config) -> Expressions {
     parser::parse(&config.program).unwrap_or_else(|e| {
-        panic!(
-            "Failed to parse input program `{}`: {:?}",
-            config.program, e.message
-        )
+        panic!("Failed to parse input program `{}`: {:?}", config.program, e.message)
     })
 }
 
@@ -53,9 +50,9 @@ pub fn build(config: &Config) -> bool {
 /// Run the generated binary and return output
 pub fn run(config: &Config) -> Result<String, std::io::Error> {
     let path = PathBuf::from(&config.output).canonicalize().unwrap();
-    let proc = Command::new(&path).output().unwrap_or_else(|e| {
-        panic!("Failed to run binary `{}`; error: `{}`", &path.display(), e)
-    });
+    let proc = Command::new(&path)
+        .output()
+        .unwrap_or_else(|e| panic!("Failed to run binary `{}`; error: `{}`", &path.display(), e));
 
     Ok(String::from_utf8(proc.stdout).unwrap().trim().to_string())
 }

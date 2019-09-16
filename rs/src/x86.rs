@@ -143,14 +143,8 @@ pub enum Register {
 }
 
 /// Registers for argument passing
-pub const SYS_V: [Register; 6] = [
-    Register::RDI,
-    Register::RSI,
-    Register::RDX,
-    Register::RCX,
-    Register::R8,
-    Register::R9,
-];
+pub const SYS_V: [Register; 6] =
+    [Register::RDI, Register::RSI, Register::RDX, Register::RCX, Register::R8, Register::R9];
 
 /// Relative addressing modes for memory access
 ///

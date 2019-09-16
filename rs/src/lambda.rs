@@ -66,10 +66,8 @@ fn lift1(s: &mut State, prog: &Expr) -> (Vec<Expr>, Expr) {
         //
         // 1. If the binding is a λ, remove it and add to labels
         Let { bindings, body } => {
-            let (functions, rest): (T, T) = bindings
-                .clone()
-                .into_iter()
-                .partition(|(_name, value)| match &value {
+            let (functions, rest): (T, T) =
+                bindings.clone().into_iter().partition(|(_name, value)| match &value {
                     Lambda { .. } => true,
                     _ => false,
                 });
@@ -135,11 +133,7 @@ pub fn code(s: &mut State, codes: Expressions) -> ASM {
 
                 for (i, arg) in formals.iter().enumerate() {
                     let i: i64 = i.try_into().unwrap();
-                    s.set(
-                        &arg,
-                        Relative { register: RBP, offset: -(i + 1) * WORDSIZE }
-                            .into(),
-                    );
+                    s.set(&arg, Relative { register: RBP, offset: -(i + 1) * WORDSIZE }.into());
                 }
 
                 for b in body {
@@ -225,10 +219,7 @@ mod tests {
 
         assert_eq!(
             e.0[0],
-            Let {
-                bindings: vec![],
-                body: vec![List(vec![Identifier("id".into()), Number(42)])]
-            }
+            Let { bindings: vec![], body: vec![List(vec![Identifier("id".into()), Number(42)])] }
         );
     }
 

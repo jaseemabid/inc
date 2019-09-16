@@ -48,9 +48,7 @@ pub mod state {
         }
 
         pub fn leave(&mut self) {
-            let unwind = self.env.0.first().expect("unexpected empty env").len()
-                as i64
-                * WORDSIZE;
+            let unwind = self.env.0.first().expect("unexpected empty env").len() as i64 * WORDSIZE;
             self.si += unwind;
             self.env.leave()
         }
@@ -214,12 +212,7 @@ pub mod emit {
     }
 
     /// Emit code for a conditional expression
-    pub fn cond(
-        s: &mut State,
-        p: &Expr,
-        then: &Expr,
-        alt: &Option<Box<Expr>>,
-    ) -> ASM {
+    pub fn cond(s: &mut State, p: &Expr, then: &Expr, alt: &Option<Box<Expr>>) -> ASM {
         let exit_label = s.gen_label();
         let alt_label = s.gen_label();
 
@@ -266,8 +259,7 @@ pub mod emit {
             List(list) => match list.as_slice() {
                 // User defined or runtime functions
                 [Identifier(f), args @ ..]
-                    if (s.functions.contains(f)
-                        || runtime::FUNCTIONS.contains(&&f.as_str())) =>
+                    if (s.functions.contains(f) || runtime::FUNCTIONS.contains(&&f.as_str())) =>
                 {
                     lambda::call(s, f, &Expressions(args.to_vec()))
                 }
@@ -322,10 +314,7 @@ pub mod emit {
 
         let (codes, prog) = lambda::lift(&mut s, &prog);
 
-        let mut gen = x86::prelude()
-            + x86::func(&x86::init())
-            + x86::enter()
-            + x86::init_heap();
+        let mut gen = x86::prelude() + x86::func(&x86::init()) + x86::enter() + x86::init_heap();
 
         for b in &prog.0 {
             gen += eval(&mut s, &b);

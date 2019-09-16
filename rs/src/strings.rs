@@ -73,9 +73,10 @@ pub fn inline(s: &State) -> ASM {
 fn address(s: &State, t: &Expr, to: Register) -> ASM {
     match t {
         Expr::Str(tag) => {
-            let index = s.symbols.get(tag).unwrap_or_else(|| {
-                panic!("String `{}` not found in symbol table", tag)
-            });
+            let index = s
+                .symbols
+                .get(tag)
+                .unwrap_or_else(|| panic!("String `{}` not found in symbol table", tag));
 
             x86::lea(to, &label(*index), immediate::STR).into()
         }

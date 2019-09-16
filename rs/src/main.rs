@@ -36,9 +36,7 @@ fn main() -> Result<(), std::io::Error> {
     };
 
     let mut program = String::new();
-    io::stdin()
-        .read_to_string(&mut program)
-        .expect("Expected a program in stdin");
+    io::stdin().read_to_string(&mut program).expect("Expected a program in stdin");
 
     let config = Config { program, output, exec };
 
