@@ -296,6 +296,10 @@ mod cond {
         ];
         test_many(&tests)
     }
+    #[test]
+    fn strings() {
+        test1("(if (zero? 1) \"yes\" \"nope\")", "nope")
+    }
 }
 
 // Step 7: Pairs in heap
