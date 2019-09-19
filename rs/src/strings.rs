@@ -138,6 +138,15 @@ fn lift1(s: &mut State, prog: &Expr) {
                 lift1(s, l);
             }
         }
+
+        Cond { pred, then, alt } => {
+            lift1(s, pred);
+            lift1(s, then);
+            if let Some(e) = alt {
+                lift1(s, e)
+            }
+        }
+
         _ => {}
     }
 }
