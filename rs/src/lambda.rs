@@ -62,46 +62,41 @@ pub fn lift(s: &mut State, prog: &Expressions) -> (Vec<Code>, Expressions) {
 /// Lift returns a list of definitions and an expression with inline lambdas and
 /// function definitions replaced with unique names.
 fn lift1(s: &mut State, prog: &Expr) -> (Vec<Code>, Expr) {
-    type T = Vec<(String, Expr)>;
-    match prog {
-        // Lift lambda bindings while and give it a name
-        //
-        // 1. If the binding is a λ, remove it and add to labels
-        Let { bindings, body } => {
-            let (functions, rest): (T, T) =
-                bindings.clone().into_iter().partition(|(_name, value)| match &value {
-                    Lambda { .. } => true,
-                    _ => false,
-                });
+    // Codes are all the function bodies found within this expression
+    let mut codes: Vec<Code> = vec![];
 
-            let codes = functions
-                .iter()
-                .map(|(name, f)| {
-                    // TODO: Ensure uniqueness of names here
-                    s.functions.insert(name.to_string());
-                    match &f {
-                        // Attach the bound name to lambda
-                        Lambda(Code { formals, free, body, .. }) => Code {
+    // Original expression with inline lambdas and declarations replaced
+    let lifted: Expr = match prog {
+        Let { bindings, body } => {
+            // Rest is all the name bindings that are not functions
+            let mut rest: Vec<(String, Expr)> = vec![];
+
+            for (name, value) in bindings {
+                match value {
+                    Lambda(Code { formals, free, body, .. }) => {
+                        s.functions.insert(name.to_string());
+                        codes.push(Code {
                             name: Some(name.to_string()),
                             formals: formals.to_vec(),
                             free: free.to_vec(),
                             body: body.to_vec(),
-                        },
-                        _ => unreachable!("non λ in a list of lambdas"),
+                        });
                     }
-                })
-                .collect();
 
-            let expr = Let { bindings: rest, body: body.to_vec() };
+                    _ => rest.push((name.clone(), value.clone())),
+                }
+            }
 
-            (codes, expr)
+            Let { bindings: rest, body: body.to_vec() }
         }
 
         // A literal lambda must be in an inline calling position
-        Lambda { .. } => unimplemented!("inline λ"),
+        Lambda(Code { .. }) => unimplemented!("inline λ"),
 
-        _ => (vec![], prog.clone()),
-    }
+        _ => prog.clone(),
+    };
+
+    (codes, lifted)
 }
 
 /// Function body for the simplest C style functions
