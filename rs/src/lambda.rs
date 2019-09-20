@@ -37,8 +37,6 @@ use crate::{
     x86::{self, Register::*, Relative, ASM, WORDSIZE},
 };
 
-use std::convert::TryInto;
-
 /// Scan through the source and lift lambdas into top level.
 //
 // TODO:
@@ -136,8 +134,10 @@ pub fn code(s: &mut State, codes: Expressions) -> ASM {
                 s.enter();
 
                 for (i, arg) in formals.iter().enumerate() {
-                    let i: i64 = i.try_into().unwrap();
-                    s.set(&arg, Relative { register: RBP, offset: -(i + 1) * WORDSIZE }.into());
+                    s.set(
+                        &arg,
+                        Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into(),
+                    );
                 }
 
                 for b in body {
@@ -174,9 +174,7 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     // and this is a whole lot more complex than it looks like. The recursive
     // definition in scheme with persistent `s` is significantly cleaner.
     for (i, arg) in args.0.iter().enumerate() {
-        let i: i64 = i.try_into().unwrap();
-        s.si = si - ((i + 2) * WORDSIZE);
-
+        s.si = si - ((i as i64 + 2) * WORDSIZE);
         asm += eval(s, arg);
         asm += x86::save(RAX.into(), s.si);
     }

@@ -39,7 +39,6 @@ use crate::{
         ASM,
     },
 };
-use std::convert::TryFrom;
 
 /// Evaluate a string object
 pub fn eval(s: &State, data: &str) -> ASM {
@@ -98,13 +97,12 @@ fn label(index: usize) -> String {
 /// Allocate a string object in heap with a specific size
 #[allow(clippy::identity_op)]
 pub fn make(_: &State, size: i64) -> ASM {
-    let len = i64::try_from(size).unwrap();
-    let size = ((len + 7) / 8) * 8;
+    let aligned = ((size as i64 + 7) / 8) * 8;
 
-    x86::mov(Reference::from(RSI + 0), len.into())
+    x86::mov(Reference::from(RSI + 0), size.into())
         + x86::mov(RAX.into(), RSI.into())
         + x86::or(RAX.into(), immediate::STR.into())
-        + x86::add(RSI.into(), size.into())
+        + x86::add(RSI.into(), aligned.into())
 }
 
 /// Lift static strings into a symbol table for inlining later.
