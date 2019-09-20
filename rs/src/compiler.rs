@@ -85,9 +85,9 @@ pub mod state {
         }
 
         /// Generate a unique label for jump targets.
-        pub fn gen_label(&mut self) -> String {
+        pub fn gen_label(&mut self, prefix: &str) -> String {
             self.li += 1;
-            format!("L_{}", self.li)
+            format!("{}_{}", prefix, self.li)
         }
     }
     // Environment is an *ordered* list of bindings.
@@ -213,8 +213,8 @@ pub mod emit {
 
     /// Emit code for a conditional expression
     pub fn cond(s: &mut State, p: &Expr, then: &Expr, alt: &Option<Box<Expr>>) -> ASM {
-        let exit_label = s.gen_label();
-        let alt_label = s.gen_label();
+        let exit_label = s.gen_label("exit");
+        let alt_label = s.gen_label("else");
 
         // A conditional without an explicit alternate should evaluate to '()
         let t = match alt {
