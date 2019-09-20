@@ -31,6 +31,7 @@
 use crate::{
     compiler::{emit::eval, state::State},
     core::{
+        Code,
         Expr::{self, *},
         Expressions,
     },
@@ -42,14 +43,14 @@ use crate::{
 // TODO:
 // 1. Ensure labels are unique
 //
-pub fn lift(s: &mut State, prog: &Expressions) -> (Expressions, Expressions) {
-    let mut codes: Expressions = Default::default();
+pub fn lift(s: &mut State, prog: &Expressions) -> (Vec<Code>, Expressions) {
+    let mut codes: Vec<Code> = vec![];
     let mut lifted: Expressions = Default::default();
 
     for expr in &prog.0 {
         let (c, e) = lift1(s, &expr);
 
-        codes.0.extend(c);
+        codes.extend(c);
         lifted.0.push(e);
     }
 
@@ -60,7 +61,7 @@ pub fn lift(s: &mut State, prog: &Expressions) -> (Expressions, Expressions) {
 ///
 /// Lift returns a list of definitions and an expression with inline lambdas and
 /// function definitions replaced with unique names.
-fn lift1(s: &mut State, prog: &Expr) -> (Vec<Expr>, Expr) {
+fn lift1(s: &mut State, prog: &Expr) -> (Vec<Code>, Expr) {
     type T = Vec<(String, Expr)>;
     match prog {
         // Lift lambda bindings while and give it a name
@@ -80,7 +81,7 @@ fn lift1(s: &mut State, prog: &Expr) -> (Vec<Expr>, Expr) {
                     s.functions.insert(name.to_string());
                     match &f {
                         // Attach the bound name to lambda
-                        Lambda { formals, free, body, .. } => Lambda {
+                        Lambda(Code { formals, free, body, .. }) => Code {
                             name: Some(name.to_string()),
                             formals: formals.to_vec(),
                             free: free.to_vec(),
@@ -117,39 +118,31 @@ fn lift1(s: &mut State, prog: &Expr) -> (Vec<Expr>, Expr) {
 /// 32` etc. The function preamble effectively decrements the base pointer
 /// by `0x10` such that the such that the first argument can be accessed at
 /// `RBP - 8`, the next one at `RBP - 16` etc.
-pub fn code(s: &mut State, codes: Expressions) -> ASM {
+pub fn code(s: &mut State, codes: Vec<Code>) -> ASM {
     let mut asm = ASM(vec![]);
 
-    for code in &codes.0 {
-        match code {
-            Lambda { name: Some(name), formals, body, .. } => {
-                asm += x86::func(name);
+    for Code { name, formals, body, .. } in &codes {
+        asm += x86::func(name.as_ref().unwrap().as_str());
 
-                // Start a new lexical environment for the function, add the
-                // formal arguments and leave when it is evaluated. The first
-                // argument is available at `RBP - 8`, next at `RBP - 16` etc.
-                //
-                // TODO: `alloc()` and `dealloc()` doesn't understand `enter()` and
-                // `leave()`, so there is a fair bit of duplication here.
-                s.enter();
+        // Start a new lexical environment for the function, add the
+        // formal arguments and leave when it is evaluated. The first
+        // argument is available at `RBP - 8`, next at `RBP - 16` etc.
+        //
+        // TODO: `alloc()` and `dealloc()` doesn't understand `enter()` and
+        // `leave()`, so there is a fair bit of duplication here.
+        s.enter();
 
-                for (i, arg) in formals.iter().enumerate() {
-                    s.set(
-                        &arg,
-                        Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into(),
-                    );
-                }
-
-                for b in body {
-                    asm += x86::enter();
-                    asm += eval(s, b);
-                    asm += x86::leave()
-                }
-
-                s.leave()
-            }
-            _ => unreachable!("emit λ for `{}`", code),
+        for (i, arg) in formals.iter().enumerate() {
+            s.set(&arg, Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into());
         }
+
+        for b in body {
+            asm += x86::enter();
+            asm += eval(s, b);
+            asm += x86::leave()
+        }
+
+        s.leave()
     }
     asm
 }
@@ -224,8 +217,8 @@ mod tests {
         let (codes, e) = lift(&mut s, &expr);
 
         assert_eq!(
-            codes.0,
-            vec![Lambda {
+            codes,
+            vec![Code {
                 name: Some("id".into()),
                 formals: vec!["x".into()],
                 free: vec![],
@@ -255,8 +248,8 @@ mod tests {
         let (codes, e) = lift(&mut s, &expr);
 
         assert_eq!(
-            codes.0.get(0).unwrap(),
-            &Lambda {
+            codes.get(0).unwrap(),
+            &Code {
                 name: Some("e".into()),
                 formals: vec!["x".into()],
                 free: vec![],
@@ -272,8 +265,8 @@ mod tests {
         );
 
         assert_eq!(
-            codes.0.get(1).unwrap(),
-            &Lambda {
+            codes.get(1).unwrap(),
+            &Code {
                 name: Some("o".into()),
                 formals: vec!["x".into()],
                 free: vec![],

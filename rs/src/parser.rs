@@ -123,7 +123,7 @@ fn lambda_syntax(i: &str) -> IResult<&str, Expr> {
     let (i, (_, _, _, formals, _, body, _, _)) =
         tuple((open, tag("lambda"), space1, formals, space0, body, space0, close))(i)?;
 
-    Ok((i, Expr::Lambda { name: None, formals, body, free: vec![] }))
+    Ok((i, Expr::Lambda(Code { name: None, formals, body, free: vec![] })))
 }
 
 /// `(if <expression> <expression> <expression>) | (if <expression> <expression>)`
@@ -534,44 +534,44 @@ mod tests {
     #[test]
     fn lambda_syntax() {
         let prog = "(lambda () 1)";
-        let exp = Lambda { name: None, formals: vec![], body: vec![Number(1)], free: vec![] };
+        let exp = Lambda(Code { name: None, formals: vec![], body: vec![Number(1)], free: vec![] });
 
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(lambda (a b ) a)";
-        let exp = Lambda {
+        let exp = Lambda(Code {
             name: None,
             formals: vec!["a".into(), "b".into()],
             free: vec![],
             body: vec![Identifier("a".into())],
-        };
+        });
 
         assert_eq!(ok(vec![exp]), program(prog));
         // assert_eq!(ok(exp), super::lambda_syntax(prog));
 
         let prog = "(lambda (a b) (+ b a))";
-        let exp = Lambda {
+        let exp = Lambda(Code {
             name: None,
             free: vec![],
             formals: vec!["a".into(), "b".into()],
             body: vec![Expr::List(vec!["+".into(), "b".into(), "a".into()])],
-        };
+        });
 
         assert_eq!(ok(vec![exp]), program(prog));
         // assert_eq!(ok(exp), super::lambda_syntax(prog));
 
         let prog = "(lambda a a)";
-        let exp = Lambda {
+        let exp = Lambda(Code {
             name: None,
             formals: vec!["a".into()],
             free: vec![],
             body: vec![Identifier("a".into())],
-        };
+        });
 
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(lambda (x) (if #t 1 2))";
-        let exp = Lambda {
+        let exp = Lambda(Code {
             name: None,
             formals: vec!["x".into()],
             free: vec![],
@@ -580,12 +580,12 @@ mod tests {
                 then: Box::new(Number(1)),
                 alt: Some(Box::new(Number(2))),
             }],
-        };
+        });
 
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(lambda (x) (if (zero? x) 1 (* x (f (dec x)))))";
-        let exp = Lambda {
+        let exp = Lambda(Code {
             name: None,
             formals: vec!["x".into()],
             free: vec![],
@@ -601,7 +601,7 @@ mod tests {
                     ]),
                 ]))),
             }],
-        };
+        });
 
         assert_eq!(ok(vec![exp]), program(prog));
     }

@@ -36,27 +36,25 @@ pub enum Expr {
     // is just a convenient way to have a `Box<[Expr]>`
     List(Vec<Expr>),
     // Conditional
-    Cond {
-        pred: Box<Expr>,
-        then: Box<Expr>,
-        alt: Option<Box<Expr>>,
-    },
+    Cond { pred: Box<Expr>, then: Box<Expr>, alt: Option<Box<Expr>> },
     // Variable bindings
-    Let {
-        bindings: Vec<(String, Expr)>,
-        body: Vec<Expr>,
-    },
+    Let { bindings: Vec<(String, Expr)>, body: Vec<Expr> },
     // Functions
-    Lambda {
-        // A rose by any other name would smell as sweet
-        name: Option<String>,
-        // Formal arguments to the function, filled in by the parser
-        formals: Vec<String>,
-        // Free variables, added post closure conversion
-        free: Vec<String>,
-        // A body is a list of expressions evaluated in order
-        body: Vec<Expr>,
-    },
+    Lambda(Code),
+}
+
+/// Core is a refinement type for Expression, since several parts of the
+/// compiler will work on this smaller subset.
+#[derive(Debug, PartialEq, Clone)]
+pub struct Code {
+    // A rose by any other name would smell as sweet
+    pub name: Option<String>,
+    // Formal arguments to the function, filled in by the parser
+    pub formals: Vec<String>,
+    // Free variables, added post closure conversion
+    pub free: Vec<String>,
+    // A body is a list of expressions evaluated in order
+    pub body: Vec<Expr>,
 }
 
 /// Expressions wrap over `Vec<T>` so new traits can be defined on it
@@ -95,7 +93,7 @@ impl fmt::Display for Expr {
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
-            Expr::Lambda { formals, body, .. } => {
+            Expr::Lambda(Code { formals, body, .. }) => {
                 write!(f, "(λ (")?;
                 formals.iter().for_each(|arg| write!(f, "{}", arg).unwrap());
                 write!(f, ") ")?;
