@@ -160,11 +160,25 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     //     808 -> arg 1
     //     800 -> arg 2
     let mut asm = ASM(vec![]);
+
+    // The original stack index - used for remembering index after recursive
+    // calls. This wouldn't be required if we could pass an immutable copy into
+    // recursive calls of eval.
+    let si = s.si;
+
+    // Lack of persistent state makes this code fairly difficult to understand
+    // and this is a whole lot more complex than it looks like. The recursive
+    // definition in scheme with persistent `s` is significantly cleaner.
     for (i, arg) in args.0.iter().enumerate() {
         let i: i64 = i.try_into().unwrap();
+        s.si = si - ((i + 2) * WORDSIZE);
+
         asm += eval(s, arg);
-        asm += x86::save(RAX.into(), s.si - ((i + 2) * WORDSIZE));
+        asm += x86::save(RAX.into(), s.si);
     }
+
+    // Set stack index back to where it used to be after evaluating all args
+    s.si = si;
 
     // Extend stack to hold the current local variables before creating a
     // new frame for the function call. `si` is the next available empty
