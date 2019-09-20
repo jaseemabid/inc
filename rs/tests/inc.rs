@@ -459,6 +459,14 @@ mod functions {
             "35",
         );
     }
+
+    // Lambda lifts are not recursive yet, so there is no point testing for this
+    // one yet.
+    #[test]
+    #[ignore]
+    fn closure() {
+        test1("(let ((x 42)) (let ((f (lambda () x))) (f)))", "12")
+    }
 }
 
 // Get a test config with program as input
