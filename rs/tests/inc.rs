@@ -374,7 +374,7 @@ mod strings {
 
     #[test]
     fn args() {
-        test1("(if (zero? 1) \"yes\" \"nope\")", "nope")
+        test1("(if (zero? 1) \"yes\" \"nope\")", "\"nope\"")
     }
 
     #[test]
