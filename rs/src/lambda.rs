@@ -58,7 +58,10 @@ pub fn lift(s: &mut State, prog: &Expressions) -> (Expressions, Expressions) {
     (codes, lifted)
 }
 
-/// Lift a single expression to top level
+/// Lift an expression to top level
+///
+/// Lift returns a list of definitions and an expression with inline lambdas and
+/// function definitions replaced with unique names.
 fn lift1(s: &mut State, prog: &Expr) -> (Vec<Expr>, Expr) {
     type T = Vec<(String, Expr)>;
     match prog {
@@ -75,6 +78,7 @@ fn lift1(s: &mut State, prog: &Expr) -> (Vec<Expr>, Expr) {
             let codes = functions
                 .iter()
                 .map(|(name, f)| {
+                    // TODO: Ensure uniqueness of names here
                     s.functions.insert(name.to_string());
                     match &f {
                         // Attach the bound name to lambda
@@ -237,17 +241,58 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn recursive() {
-    //     let sample = r"(letrec ((e (lambda (x) (if (zero? x) #t (o (dec x)))))
-    //                             (o (lambda (x) (if (zero? x) #f (e (dec x))))))
-    //                      (e 25)))";
-    //
-    //     let lifted = r"(labels ((o (code (x) (e) (if (zero? x) #f (e (dec x)))))
-    //                             (e (code (x) (o) (if (zero? x) #t (o (dec x))))))
-    //                      (labelcall e 25)))";
-    //
-    //     // super::lift(s: &mut State, prog: &Expr) {
-    //     assert_eq!(sample, lifted);
-    // }
+    #[test]
+    fn recursive() {
+        let prog = r"(let ((e (lambda (x) (if (zero? x) #t (o (dec x)))))
+                           (o (lambda (x) (if (zero? x) #f (e (dec x))))))
+                       (e 25)))";
+
+        let mut s: State = Default::default();
+
+        let expr = match parser::parse(prog) {
+            Ok(r) => r,
+            Err(e) => panic!(e),
+        };
+
+        let (codes, e) = lift(&mut s, &expr);
+
+        assert_eq!(
+            codes.0.get(0).unwrap(),
+            &Lambda {
+                name: Some("e".into()),
+                formals: vec!["x".into()],
+                free: vec![],
+                body: vec![Cond {
+                    pred: Box::new(List(vec![Identifier("zero?".into()), Identifier("x".into())])),
+                    then: Box::new(Boolean(true)),
+                    alt: Some(Box::new(List(vec![
+                        Identifier("o".into()),
+                        List(vec![Identifier("dec".into()), Identifier("x".into())])
+                    ])))
+                }]
+            }
+        );
+
+        assert_eq!(
+            codes.0.get(1).unwrap(),
+            &Lambda {
+                name: Some("o".into()),
+                formals: vec!["x".into()],
+                free: vec![],
+                body: vec![Cond {
+                    pred: Box::new(List(vec![Identifier("zero?".into()), Identifier("x".into())])),
+                    then: Box::new(Boolean(false)),
+                    alt: Some(Box::new(List(vec![
+                        Identifier("e".into()),
+                        List(vec![Identifier("dec".into()), Identifier("x".into())])
+                    ])))
+                }]
+            }
+        );
+
+        assert_eq!(
+            e.0[0],
+            Let { bindings: vec![], body: vec![List(vec![Identifier("e".into()), Number(25)])] }
+        );
+    }
 }
