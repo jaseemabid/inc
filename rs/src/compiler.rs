@@ -171,7 +171,7 @@ pub mod emit {
             Expr::{self, *},
             Expressions,
         },
-        immediate, lambda, primitives, runtime, strings,
+        immediate, lambda, lang, primitives, runtime, strings,
         x86::{self, Ins, Reference, Register::*, Relative, ASM},
     };
 
@@ -311,6 +311,7 @@ pub mod emit {
         let mut s: State = Default::default();
 
         strings::lift(&mut s, &prog);
+        let prog = lang::rename(&prog);
 
         let (codes, prog) = lambda::lift(&mut s, &prog);
 
