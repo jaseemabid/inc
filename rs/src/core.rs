@@ -3,16 +3,7 @@
 //! An [`Expr`] is a single statement in the program. The parser returns a list
 //! of this type.
 //!
-//! Since a vector of [`Expr`] is a very common type, its aliased to
-//! [`Expressions`].
-//!
-//! A [`Program`] is a list of expressions and the metadata along with it. This
-//! type is very useful for global transformations like closure conversions,
-//! inlining, interpretations and sub expression elimination.
-//!
 //! [`Expr`]: core::Expr
-//! [`Expressions`]: core::Expressions
-//! [`Program`]: core::Program
 use std::fmt;
 
 /// Abstract Syntax Tree for a single expression
@@ -57,14 +48,6 @@ pub struct Code {
     pub body: Vec<Expr>,
 }
 
-/// Expressions wrap over `Vec<T>` so new traits can be defined on it
-#[derive(Debug, Default)]
-pub struct Expressions(pub Vec<Expr>);
-
-/// All the expressions and the metadata
-#[derive(Debug, Default)]
-pub struct Program(pub Vec<Expr>);
-
 /// Pretty print an Expr
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -101,13 +84,6 @@ impl fmt::Display for Expr {
                 write!(f, ")")
             }
         }
-    }
-}
-
-impl fmt::Display for Expressions {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.iter().for_each(|e| write!(f, "{}", e).unwrap());
-        Ok(())
     }
 }
 

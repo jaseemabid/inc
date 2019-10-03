@@ -5,13 +5,12 @@
 use crate::core::{
     Code,
     Expr::{self, *},
-    Expressions,
 };
 use std::collections::HashMap;
 
 /// Rename/mangle all references to unique names
-pub fn rename(prog: &Expressions) -> Expressions {
-    Expressions(prog.0.iter().map(|e| mangle(&HashMap::<String, i64>::new(), e)).collect())
+pub fn rename(prog: &Vec<Expr>) -> Vec<Expr> {
+    prog.iter().map(|e| mangle(&HashMap::<String, i64>::new(), e)).collect()
 }
 
 /// Mangle a single expression with letrec support.
@@ -85,13 +84,13 @@ fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
 mod tests {
     use super::*;
     use crate::{
-        core::{Error, Expr, Expressions},
+        core::{Error, Expr},
         parser::parse,
     };
     use pretty_assertions::assert_eq;
 
-    fn one(x: Result<Expressions, Error>) -> Expr {
-        x.unwrap().0[0].clone()
+    fn one(x: Result<Vec<Expr>, Error>) -> Expr {
+        x.unwrap()[0].clone()
     }
 
     #[test]

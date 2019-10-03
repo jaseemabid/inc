@@ -167,10 +167,7 @@ pub mod state {
 pub mod emit {
     use crate::{
         compiler::state::State,
-        core::{
-            Expr::{self, *},
-            Expressions,
-        },
+        core::Expr::{self, *},
         immediate, lambda, lang, primitives, runtime, strings,
         x86::{self, Ins, Reference, Register::*, Relative, ASM},
     };
@@ -261,7 +258,7 @@ pub mod emit {
                 [Identifier(f), args @ ..]
                     if (s.functions.contains(f) || runtime::FUNCTIONS.contains(&&f.as_str())) =>
                 {
-                    lambda::call(s, f, &Expressions(args.to_vec()))
+                    lambda::call(s, f, &args.to_vec())
                 }
 
                 [Identifier(i), arg] => match &i[..] {
@@ -307,7 +304,7 @@ pub mod emit {
     }
 
     /// Top level interface to the emit module
-    pub fn program(prog: Expressions) -> String {
+    pub fn program(prog: Vec<Expr>) -> String {
         let mut s: State = Default::default();
 
         strings::lift(&mut s, &prog);
@@ -317,7 +314,7 @@ pub mod emit {
 
         let mut gen = x86::prelude() + x86::func(&x86::init()) + x86::enter() + x86::init_heap();
 
-        for b in &prog.0 {
+        for b in &prog {
             gen += eval(&mut s, &b);
         }
 

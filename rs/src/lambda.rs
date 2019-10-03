@@ -33,7 +33,6 @@ use crate::{
     core::{
         Code,
         Expr::{self, *},
-        Expressions,
     },
     x86::{self, Register::*, Relative, ASM, WORDSIZE},
 };
@@ -43,15 +42,15 @@ use crate::{
 // TODO:
 // 1. Ensure labels are unique
 //
-pub fn lift(s: &mut State, prog: &Expressions) -> (Vec<Code>, Expressions) {
+pub fn lift(s: &mut State, prog: &Vec<Expr>) -> (Vec<Code>, Vec<Expr>) {
     let mut codes: Vec<Code> = vec![];
-    let mut lifted: Expressions = Default::default();
+    let mut lifted: Vec<Expr> = Default::default();
 
-    for expr in &prog.0 {
+    for expr in prog {
         let (c, e) = lift1(s, &expr);
 
         codes.extend(c);
-        lifted.0.push(e);
+        lifted.push(e);
     }
 
     (codes, lifted)
@@ -143,7 +142,7 @@ pub fn code(s: &mut State, codes: Vec<Code>) -> ASM {
 }
 
 /// Emit code for a function application. See `code` for details.
-pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
+pub fn call(s: &mut State, name: &str, args: &Vec<Expr>) -> ASM {
     // Evaluate and push the arguments into stack; 2 words below SI. See
     // `code` docs for a detailed description of how this works.
     //
@@ -161,7 +160,7 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     // Lack of persistent state makes this code fairly difficult to understand
     // and this is a whole lot more complex than it looks like. The recursive
     // definition in scheme with persistent `s` is significantly cleaner.
-    for (i, arg) in args.0.iter().enumerate() {
+    for (i, arg) in args.iter().enumerate() {
         s.si = si - ((i as i64 + 2) * WORDSIZE);
         asm += eval(s, arg);
         asm += x86::save(RAX.into(), s.si);
@@ -222,7 +221,7 @@ mod tests {
         );
 
         assert_eq!(
-            e.0[0],
+            e[0],
             Let { bindings: vec![], body: vec![List(vec![Identifier("id".into()), Number(42)])] }
         );
     }
@@ -277,7 +276,7 @@ mod tests {
         );
 
         assert_eq!(
-            e.0[0],
+            e[0],
             Let { bindings: vec![], body: vec![List(vec![Identifier("e".into()), Number(25)])] }
         );
     }

@@ -2,7 +2,7 @@
 
 use crate::{
     compiler::emit,
-    core::{Config, Expressions},
+    core::{Config, Expr},
     parser,
 };
 
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Parse the program and return an Expr
-pub fn parse(config: &Config) -> Expressions {
+pub fn parse(config: &Config) -> Vec<Expr> {
     parser::parse(&config.program).unwrap_or_else(|e| {
         panic!("Failed to parse input program `{}`: {:?}", config.program, e.message)
     })

@@ -43,14 +43,16 @@ fn main() -> Result<(), std::io::Error> {
     // Dump pretty printed parse tree with `-p`
     if matches.opt_present("p") {
         let p = cli::parse(&config);
-        println!("{}", p);
+        for e in p {
+            println!("{}", e);
+        }
         return Ok(());
     }
 
     // Dump raw parse tree with `-P`
     if matches.opt_present("P") {
         let p = cli::parse(&config);
-        for e in p.0 {
+        for e in p {
             println!("{:?}", e);
         }
         return Ok(());

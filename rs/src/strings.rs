@@ -31,7 +31,6 @@
 use crate::{
     compiler::state::State,
     core::Expr::{self, *},
-    core::Expressions,
     immediate,
     x86::{
         self, Ins, Reference,
@@ -106,8 +105,8 @@ pub fn make(_: &State, size: i64) -> ASM {
 }
 
 /// Lift static strings into a symbol table for inlining later.
-pub fn lift(s: &mut State, prog: &Expressions) {
-    for e in &prog.0 {
+pub fn lift(s: &mut State, prog: &Vec<Expr>) {
+    for e in prog {
         lift1(s, e);
     }
 }
