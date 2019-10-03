@@ -217,14 +217,11 @@ mod tests {
                 name: Some("id".into()),
                 formals: vec!["x".into()],
                 free: vec![],
-                body: vec![Identifier("x".into())],
+                body: vec![("x".into())],
             }]
         );
 
-        assert_eq!(
-            e[0],
-            Let { bindings: vec![], body: vec![List(vec![Identifier("id".into()), Number(42)])] }
-        );
+        assert_eq!(e[0], Let { bindings: vec![], body: vec![List(vec!["id".into(), Number(42)])] });
     }
 
     #[test]
@@ -249,11 +246,11 @@ mod tests {
                 formals: vec!["x".into()],
                 free: vec![],
                 body: vec![Cond {
-                    pred: Box::new(List(vec![Identifier("zero?".into()), Identifier("x".into())])),
+                    pred: Box::new(List(vec![("zero?".into()), ("x".into())])),
                     then: Box::new(Boolean(true)),
                     alt: Some(Box::new(List(vec![
-                        Identifier("o".into()),
-                        List(vec![Identifier("dec".into()), Identifier("x".into())])
+                        ("o".into()),
+                        List(vec![("dec".into()), ("x".into())])
                     ])))
                 }]
             }
@@ -266,11 +263,11 @@ mod tests {
                 formals: vec!["x".into()],
                 free: vec![],
                 body: vec![Cond {
-                    pred: Box::new(List(vec![Identifier("zero?".into()), Identifier("x".into())])),
+                    pred: Box::new(List(vec![("zero?".into()), ("x".into())])),
                     then: Box::new(Boolean(false)),
                     alt: Some(Box::new(List(vec![
-                        Identifier("e".into()),
-                        List(vec![Identifier("dec".into()), Identifier("x".into())])
+                        ("e".into()),
+                        List(vec![("dec".into()), ("x".into())])
                     ])))
                 }]
             }
@@ -278,7 +275,7 @@ mod tests {
 
         assert_eq!(
             e[0],
-            Let { bindings: vec![], body: vec![List(vec![Identifier("e".into()), Number(25)])] }
+            Let { bindings: vec![], body: vec![List(vec![("e".into()), Number(25)])] }
         );
     }
 }

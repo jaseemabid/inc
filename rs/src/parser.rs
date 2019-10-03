@@ -469,18 +469,14 @@ mod tests {
 
         let e1 = Let {
             bindings: vec![("x".to_string(), Number(1)), ("y".to_string(), Number(2))],
-            body: vec![List(vec![
-                Identifier("+".to_string()),
-                Identifier("x".to_string()),
-                Identifier("y".to_string()),
-            ])],
+            body: vec![List(vec![("+".into()), ("x".into()), ("y".into())])],
         };
 
         let e2 = Let {
             bindings: vec![("x".to_string(), Number(1))],
             body: vec![
                 Let { bindings: vec![("x".to_string(), Number(2))], body: vec![true.into()] },
-                Identifier("x".to_string()),
+                "x".into(),
             ],
         };
 
@@ -510,15 +506,12 @@ mod tests {
 
         let prog = "(if (zero? x) 1 (* x (f (dec x))))";
         let exp = Cond {
-            pred: Box::new(List(vec![Identifier("zero?".into()), Identifier("x".into())])),
+            pred: Box::new(List(vec![("zero?".into()), ("x".into())])),
             then: Box::new(Number(1)),
             alt: Some(Box::new(List(vec![
-                Identifier("*".into()),
-                Identifier("x".into()),
-                List(vec![
-                    Identifier("f".into()),
-                    List(vec![Identifier("dec".into()), Identifier("x".into())]),
-                ]),
+                ("*".into()),
+                ("x".into()),
+                List(vec![("f".into()), List(vec![("dec".into()), ("x".into())])]),
             ]))),
         };
 
@@ -544,7 +537,7 @@ mod tests {
             name: None,
             formals: vec!["a".into(), "b".into()],
             free: vec![],
-            body: vec![Identifier("a".into())],
+            body: vec![("a".into())],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -559,14 +552,13 @@ mod tests {
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
-        // assert_eq!(ok(exp), super::lambda_syntax(prog));
 
         let prog = "(lambda a a)";
         let exp = Lambda(Code {
             name: None,
             formals: vec!["a".into()],
             free: vec![],
-            body: vec![Identifier("a".into())],
+            body: vec![("a".into())],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -591,15 +583,12 @@ mod tests {
             formals: vec!["x".into()],
             free: vec![],
             body: vec![Cond {
-                pred: Box::new(List(vec![Identifier("zero?".into()), Identifier("x".into())])),
+                pred: Box::new(List(vec![("zero?".into()), ("x".into())])),
                 then: Box::new(Number(1)),
                 alt: Some(Box::new(List(vec![
-                    Identifier("*".into()),
-                    Identifier("x".into()),
-                    List(vec![
-                        Identifier("f".into()),
-                        List(vec![Identifier("dec".into()), Identifier("x".into())]),
-                    ]),
+                    ("*".into()),
+                    ("x".into()),
+                    List(vec![("f".into()), List(vec![("dec".into()), ("x".into())])]),
                 ]))),
             }],
         });
