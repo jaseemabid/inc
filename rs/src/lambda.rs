@@ -42,7 +42,7 @@ use crate::{
 // TODO:
 // 1. Ensure labels are unique
 //
-pub fn lift(s: &mut State, prog: &Vec<Expr>) -> (Vec<Code>, Vec<Expr>) {
+pub fn lift(s: &mut State, prog: &[Expr]) -> (Vec<Code>, Vec<Expr>) {
     let mut codes: Vec<Code> = vec![];
     let mut lifted: Vec<Expr> = Default::default();
 
@@ -142,7 +142,7 @@ pub fn code(s: &mut State, codes: Vec<Code>) -> ASM {
 }
 
 /// Emit code for a function application. See `code` for details.
-pub fn call(s: &mut State, name: &str, args: &Vec<Expr>) -> ASM {
+pub fn call(s: &mut State, name: &str, args: &[Expr]) -> ASM {
     // Evaluate and push the arguments into stack; 2 words below SI. See
     // `code` docs for a detailed description of how this works.
     //

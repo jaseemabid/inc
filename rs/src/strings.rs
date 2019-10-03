@@ -105,7 +105,7 @@ pub fn make(_: &State, size: i64) -> ASM {
 }
 
 /// Lift static strings into a symbol table for inlining later.
-pub fn lift(s: &mut State, prog: &Vec<Expr>) {
+pub fn lift(s: &mut State, prog: &[Expr]) {
     for e in prog {
         lift1(s, e);
     }

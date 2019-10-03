@@ -9,7 +9,7 @@ use crate::core::{
 use std::collections::HashMap;
 
 /// Rename/mangle all references to unique names
-pub fn rename(prog: &Vec<Expr>) -> Vec<Expr> {
+pub fn rename(prog: &[Expr]) -> Vec<Expr> {
     prog.iter().map(|e| mangle(&HashMap::<String, i64>::new(), e)).collect()
 }
 
