@@ -488,6 +488,7 @@ impl fmt::Display for ASM {
 #[cfg(test)]
 mod tests {
     use super::{Ins, Reference, Register::*};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn mov() {

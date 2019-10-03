@@ -53,6 +53,7 @@ pub fn n(i: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     // As of now, there is no need for this function in Rust other than
     // testing, but good to have :) There is an equivalent C implementation

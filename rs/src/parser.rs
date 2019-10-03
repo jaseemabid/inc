@@ -342,6 +342,7 @@ fn close(i: &str) -> IResult<&str, ()> {
 mod tests {
     use super::*;
     use crate::core::Expr::*;
+    use pretty_assertions::assert_eq;
 
     // OK consumes all of the input and succeeds
     fn ok<T, E>(t: T) -> IResult<&'static str, T, E> {

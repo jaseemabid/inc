@@ -197,6 +197,7 @@ pub fn call(s: &mut State, name: &str, args: &Vec<Expr>) -> ASM {
 mod tests {
     use super::*;
     use crate::parser;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn simple() {
