@@ -34,8 +34,7 @@ pub enum Expr {
     Lambda(Code),
 }
 
-/// Core is a refinement type for Expression, since several parts of the
-/// compiler will work on this smaller subset.
+/// Code is a refinement type for Expression specialized for lambdas
 #[derive(Debug, PartialEq, Clone)]
 pub struct Code {
     // A rose by any other name would smell as sweet
