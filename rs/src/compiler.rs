@@ -169,8 +169,8 @@ pub mod emit {
     use crate::{
         compiler::state::State,
         core::Expr::{self, *},
-        immediate, lambda, lang, primitives, runtime, strings,
         x86::{self, Ins, Reference, Register::*, Relative, ASM},
+        *,
     };
 
     /// Clear (mask) all except the least significant 3 tag bits
@@ -255,13 +255,13 @@ pub mod emit {
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
-                [Identifier(f), args @ ..] =>
-                // User defined or runtime functions
-                {
-                    if s.functions.contains(f) || runtime::FUNCTIONS.contains(&&f.as_str()) {
-                        return lambda::call(s, f, &args);
+                [Identifier(f), args @ ..] => {
+                    if s.functions.contains(f) {
+                        lambda::call(s, f, &args)
                     } else if let Some(x) = primitives::call(s, f, args) {
                         x
+                    } else if runtime::contains(f.as_str()) {
+                        runtime::ffi(s, f, &args)
                     } else {
                         panic!("Unknown function {} called with args: {:?}", f, &args)
                     }

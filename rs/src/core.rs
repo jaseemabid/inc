@@ -47,6 +47,20 @@ pub struct Code {
     pub body: Vec<Expr>,
 }
 
+impl Expr {
+    /// Is this expression a constant that would fit in a word?
+    /// This is useful for FFI into C
+    pub fn unbox(self: &Expr) -> Option<i64> {
+        match self {
+            Expr::Number(n) => Some(*n),
+            Expr::Boolean(true) => Some(1),
+            Expr::Boolean(false) => Some(0),
+            Expr::Char(c) => Some(i64::from(*c)),
+            _ => None,
+        }
+    }
+}
+
 /// Pretty print an Expr
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
