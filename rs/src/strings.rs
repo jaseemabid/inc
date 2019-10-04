@@ -98,10 +98,10 @@ fn label(index: usize) -> String {
 pub fn make(_: &State, size: i64) -> ASM {
     let aligned = ((size as i64 + 7) / 8) * 8;
 
-    x86::mov(Reference::from(RSI + 0), size.into())
-        + x86::mov(RAX.into(), RSI.into())
+    x86::mov(Reference::from(R12 + 0), size.into())
+        + x86::mov(RAX.into(), R12.into())
         + x86::or(RAX.into(), immediate::STR.into())
-        + x86::add(RSI.into(), aligned.into())
+        + x86::add(R12.into(), aligned.into())
 }
 
 /// Lift static strings into a symbol table for inlining later.

@@ -112,7 +112,7 @@ int main() {
 
     set_handler(handler);
 
-    int64_t rsi, rsp;
+    int64_t r12, rsp;
     int64_t *heap = calloc(1024, 8);
 
     // Read current stack pointer into local variable for diagnostics
@@ -121,14 +121,14 @@ int main() {
     // Execute all of the generated ASM; this could return a value or segfault
     int64_t val = init(heap);
 
-    // Copy the value of RSI into a local variable. The nop instruction makes it
+    // Copy the value of R12 into a local variable. The nop instruction makes it
     // easier to spot this in the generated asm
-    asm ("nop; movq %%rsi, %0" : "=r" (rsi));
+    asm ("nop; movq %%r12, %0" : "=r" (r12));
 
-    ptrdiff_t size = (uintptr_t)rsi - (uintptr_t)heap;
+    ptrdiff_t size = (uintptr_t)r12 - (uintptr_t)heap;
 
     fprintf(debug, "Stack base addr : %p \n", (uintptr_t *)rsp );
-    fprintf(debug, "Heap segment    : %p -> %p \n", heap, (int64_t *)rsi );
+    fprintf(debug, "Heap segment    : %p -> %p \n", heap, (int64_t *)r12);
     fprintf(debug, "Heap size       : %td bytes \n", size);
     fprintf(debug, "Value in rax    : %" PRId64, val);
     fprintf(debug, "\n\n");

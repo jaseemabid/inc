@@ -229,11 +229,11 @@ fn cons(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     let ctx = eval(s, x)
         + x86::save(RAX.into(), scratch)
         + eval(s, y)
-        + x86::mov(Reference::from(RSI + 8), RAX.into())
+        + x86::mov(Reference::from(R12 + 8), RAX.into())
         + x86::mov(RAX.into(), Reference::from(RBP + scratch))
-        + x86::mov(Reference::from(RSI + 0), RAX.into())
-        + x86::mov(RAX.into(), RSI.into())
-        + x86::add(RSI.into(), Reference::from(WORDSIZE * 2))
+        + x86::mov(Reference::from(R12 + 0), RAX.into())
+        + x86::mov(RAX.into(), R12.into())
+        + x86::add(R12.into(), Reference::from(WORDSIZE * 2))
         + x86::or(RAX.into(), immediate::PAIR.into());
 
     s.dealloc(1);

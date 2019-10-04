@@ -294,9 +294,9 @@ pub fn sub(r: Reference, v: Reference) -> Ins {
     Ins(format!("sub {}, {}", r, v))
 }
 
-/// The base address of the heap is passed in RDI and we reserve reg RSI for it.
+/// The base address of the heap is passed in RDI and we reserve reg R12 for it.
 pub fn init_heap() -> Ins {
-    Ins::from("mov rsi, rdi        # Store heap index to RSI")
+    Ins::from("mov r12, rdi        # Store heap index to R12")
 }
 
 /// Init is the target called from C.
