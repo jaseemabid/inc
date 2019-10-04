@@ -118,9 +118,6 @@ int main() {
     // Read current stack pointer into local variable for diagnostics
     asm ("nop; movq %%rsp, %0" : "=r" (rsp));
 
-    fprintf(debug, "Heap initialized at : %p  \n", heap);
-    fprintf(debug, "Stack begins at     : %p  \n", (uintptr_t *)rsp );
-
     // Execute all of the generated ASM; this could return a value or segfault
     int64_t val = init(heap);
 
@@ -130,9 +127,11 @@ int main() {
 
     ptrdiff_t size = (uintptr_t)rsi - (uintptr_t)heap;
 
-    fprintf(debug, "HEAP Segment        : %p -> %p \n" , heap, (int64_t *)rsi);
-    fprintf(debug, "HEAP size           : %td bytes\n", size);
-    fprintf(debug, "Result              : ");
+    fprintf(debug, "Stack base addr : %p \n", (uintptr_t *)rsp );
+    fprintf(debug, "Heap segment    : %p -> %p \n", heap, (int64_t *)rsi );
+    fprintf(debug, "Heap size       : %td bytes \n", size);
+    fprintf(debug, "Value in rax    : %" PRId64, val);
+    fprintf(debug, "\n\n");
     fflush(stdout);
 
     print(val, false);
