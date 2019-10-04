@@ -255,45 +255,17 @@ pub mod emit {
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
+                [Identifier(f), args @ ..] =>
                 // User defined or runtime functions
-                [Identifier(f), args @ ..]
-                    if (s.functions.contains(f) || runtime::FUNCTIONS.contains(&&f.as_str())) =>
                 {
-                    lambda::call(s, f, &args.to_vec())
+                    if s.functions.contains(f) || runtime::FUNCTIONS.contains(&&f.as_str()) {
+                        return lambda::call(s, f, &args);
+                    } else if let Some(x) = primitives::call(s, f, args) {
+                        x
+                    } else {
+                        panic!("Unknown function {} called with args: {:?}", f, &args)
+                    }
                 }
-
-                [Identifier(i), arg] => match &i[..] {
-                    "inc" => primitives::inc(s, arg),
-                    "dec" => primitives::dec(s, arg),
-                    "null?" => primitives::nullp(s, arg),
-                    "zero?" => primitives::zerop(s, arg),
-                    "not" => primitives::not(s, arg),
-                    "boolean?" => primitives::booleanp(s, arg),
-                    "char?" => primitives::charp(s, arg),
-                    "fixnum?" => primitives::fixnump(s, arg),
-                    "pair?" => primitives::pairp(s, arg),
-                    "string?" => primitives::stringp(s, arg),
-                    "car" => primitives::car(s, arg),
-                    "cdr" => primitives::cdr(s, arg),
-                    "make-string" => primitives::string::make(s, arg),
-                    n => panic!("Unknown unary primitive: {}", n),
-                },
-
-                [Identifier(name), x, y] => match &name[..] {
-                    "cons" => primitives::cons(s, x, y),
-                    "+" => primitives::plus(s, x, y),
-                    "-" => primitives::minus(s, x, y),
-                    "*" => primitives::mul(s, x, y),
-                    "/" => primitives::quotient(s, x, y),
-                    "%" => primitives::remainder(s, x, y),
-                    "=" => primitives::eq(s, x, y),
-                    ">" => primitives::gt(s, x, y),
-                    "<" => primitives::lt(s, x, y),
-                    ">=" => primitives::gte(s, x, y),
-                    "<=" => primitives::lte(s, x, y),
-                    n => panic!("Unknown binary primitive: {}", n),
-                },
-
                 _ => panic!("Unknown expression: `{}`", prog),
             },
 
