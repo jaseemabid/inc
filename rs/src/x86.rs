@@ -9,9 +9,7 @@
 //! Some reasonably good tutorials are:
 //!
 //! 1. [x86 Assembly Guide 1](https://www.cs.virginia.edu/~evans/cs216/guides/x86.html)
-//!
 //! 2. [x86 Assembly Guide 2](http://flint.cs.yale.edu/cs421/papers/x86-asm/asm.html)
-//!
 //! 3. Ops like `.p2align` are not x86 instructions but GNU assembly directives.
 //! See [GNU assembler docs](https://sourceware.org/binutils/docs-2.32/as/).
 //!
@@ -30,18 +28,41 @@
 //!
 //! 1. [Writing 64 Bit Assembly on Mac OS X](https://www.idryman.org/blog/2014/12/02/writing-64-bit-assembly-on-mac-os-x)
 //!
-//! # System V AMD64 ABI
+//! # Calling conventions on x86
 //!
-//! The default calling convention used by GCC on x86-64 seems to be System V
-//! AMD64 ABI. User defined functions, primitives as well as FFI into C must use
-//! this convention for simplicity.
+//! [The history of calling conventions, part 1][history] is a really good read
+//! on this subject.
 //!
-//! ## Registers
+//! ## C Declaration (cdecl)
+//!
+//! [cdecl] mandates that all arguments are passed in stack in reverse order
+//! (right to left) *above* the stack pointer. The caller cleans up the stack
+//! because the callee might not know how many arguments were present (hint:
+//! variadic arguments). See [history] for details.
+//!
+//! Most literature and documentation suggests that this is the default
+//! convention used by Clang and GCC on Linux, but in practice compilers seems
+//! to default to System V instead.
+//!
+//! ## Inc style
+//!
+//! This paper implements a variation of cdecl for simplicity - mainly because
+//! register allocation is a fairly hard problem. This is incidentally very
+//! similar to the Pascal style.
+//!
+//! All arguments are passed in stack left to right below the stack pointer.
+//! Stack space is reclaimed by subsequent calls and is not implicitly cleaned.
+//!
+//! ### System V AMD64 ABI
+//!
+//! GCC on x86-64 seems to be *actually* using System V AMD64 ABI. User defined
+//! functions, primitives as well as FFI into C must use this convention for
+//! simplicity when possible.
 //!
 //! Arguments are passed in the registers RDI, RSI, RDX, RCX, R8, R9 and the
 //! return value is passed back in RAX. Functions preserve the registers RBX,
-//! RSP, RBP, R12, R13, R14, and R15; while RAX, RDI, RSI, RDX, RCX, R8, R9, R10,
-//! R11 are scratch registers.
+//! RSP, RBP, R12, R13, R14, and R15; while RAX, RDI, RSI, RDX, RCX, R8, R9,
+//! R10, R11 are scratch registers.
 //!
 //! ## Reference Reading
 //!
@@ -49,6 +70,8 @@
 //! 1. [System V ABI](https://wiki.osdev.org/System_V_ABI)
 //! 1. [System V Application Binary Interface](https://github.com/jaseemabid/inc/blob/master/docs/Sys%20V%20ABI.pdf)
 //!
+//! [cdecl]: https://en.wikipedia.org/wiki/X86_calling_conventions#cdecl
+//! [history]: https://devblogs.microsoft.com/oldnewthing/?p=41213
 use std::fmt;
 use std::ops::{Add, AddAssign, Sub};
 

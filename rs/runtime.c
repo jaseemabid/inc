@@ -9,7 +9,8 @@
 
 // The default calling convention used by GCC on x86-64 seems to be System V
 // AMD64 ABI, in which arguments are passed in the registers RDI, RSI, RDX, RCX,
-// R8, R9 and the return value is passed back in RAX.
+// R8, R9 and the return value is passed back in RAX. See x86 module docs for
+// more details.
 extern int64_t init(int64_t*) __attribute__((noinline));
 
 #define numtag   0
