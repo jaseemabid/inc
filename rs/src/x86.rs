@@ -135,7 +135,7 @@ pub enum Reference {
 /// See [X86 Assembly/X86 Architecture][docs] for docs.
 ///
 /// [docs]: https://en.wikibooks.org/wiki/X86_Assembly/X86_Architecture
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Register {
     /// Accumulator (AX)
     // Used in arithmetic operations and returning values from functions.
