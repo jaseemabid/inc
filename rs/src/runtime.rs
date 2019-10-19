@@ -25,8 +25,6 @@ pub fn ffi(s: &mut State, name: &str, args: &[Expr]) -> ASM {
         panic!("foreign function {} called with more than 6 arguments: {:?}", &name, args)
     }
 
-    let name = name.replace("-", "_");
-
     for (i, arg) in args.iter().enumerate() {
         let target: Register = x86::SYS_V[i];
 
@@ -35,6 +33,8 @@ pub fn ffi(s: &mut State, name: &str, args: &[Expr]) -> ASM {
             None => eval(s, &arg) + x86::mov(Register(target), Register(RAX)),
         }
     }
+
+    let name = rename(name);
 
     // Extend stack to hold the current local variables before creating a
     // new frame for the function call. `si` is the next available empty
@@ -56,4 +56,15 @@ pub fn ffi(s: &mut State, name: &str, args: &[Expr]) -> ASM {
 
 pub fn contains(name: &str) -> bool {
     SYMBOLS.contains(&name)
+}
+
+// On macos, function names must be prefixed an underscore like _init
+#[cfg(target_os = "linux")]
+fn rename(name: &str) -> String {
+    name.replace("-", "_")
+}
+
+#[cfg(target_os = "macos")]
+fn rename(name: &str) -> String {
+    format!("_{}", name.replace("-", "_"))
 }
