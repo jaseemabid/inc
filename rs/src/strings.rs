@@ -30,7 +30,6 @@
 
 use crate::{
     compiler::state::State,
-    core::Expr::{self, *},
     immediate,
     x86::{
         self, Ins, Reference,
@@ -83,48 +82,4 @@ pub fn make(_: &State, size: i64) -> ASM {
         + x86::mov(RAX.into(), R12.into())
         + x86::or(RAX.into(), immediate::STR.into())
         + x86::add(R12.into(), aligned.into())
-}
-
-/// Lift static strings into a symbol table for inlining later.
-pub fn lift(s: &mut State, prog: &[Expr]) {
-    for e in prog {
-        lift1(s, e);
-    }
-}
-
-// Lift a single expression
-fn lift1(s: &mut State, prog: &Expr) {
-    match prog {
-        Str(reference) => {
-            if !s.symbols.contains_key(reference) {
-                s.symbols.insert(reference.clone(), s.symbols.len());
-            }
-        }
-
-        Let { bindings, body } => {
-            for (_name, expr) in bindings {
-                lift1(s, expr);
-            }
-
-            for b in body {
-                lift1(s, b)
-            }
-        }
-
-        List(list) => {
-            for l in list {
-                lift1(s, l);
-            }
-        }
-
-        Cond { pred, then, alt } => {
-            lift1(s, pred);
-            lift1(s, then);
-            if let Some(e) = alt {
-                lift1(s, e)
-            }
-        }
-
-        _ => {}
-    }
 }

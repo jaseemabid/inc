@@ -281,10 +281,8 @@ pub mod emit {
     pub fn program(prog: Vec<Expr>) -> String {
         let mut s: State = Default::default();
 
-        strings::lift(&mut s, &prog);
+        let prog = lang::lift(&mut s, &prog);
         let prog = lang::rename(&prog);
-
-        let prog = lambda::lift(&mut s, &prog);
 
         let mut gen = x86::prelude() + x86::func(&x86::init()) + x86::enter() + x86::init_heap();
 
