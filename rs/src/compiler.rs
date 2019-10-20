@@ -2,8 +2,9 @@
 
 /// State for the code generator
 pub mod state {
+    use crate::core::Code;
     use crate::x86::{Reference, ASM, WORDSIZE};
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
     /// State for the code generator; easier to bundle it all into a struct than
     /// pass several arguments in.
@@ -25,7 +26,7 @@ pub mod state {
         pub asm: ASM,
         li: u64,
         pub symbols: HashMap<String, usize>,
-        pub functions: HashSet<String>,
+        pub functions: HashMap<String, Code>,
         env: Env,
     }
 
@@ -36,7 +37,7 @@ pub mod state {
                 asm: Default::default(),
                 li: 0,
                 symbols: HashMap::new(),
-                functions: HashSet::new(),
+                functions: HashMap::new(),
                 env: Default::default(),
             }
         }
@@ -256,7 +257,7 @@ pub mod emit {
 
             List(list) => match list.as_slice() {
                 [Identifier(f), args @ ..] => {
-                    if s.functions.contains(f) {
+                    if s.functions.contains_key(f) {
                         lambda::call(s, f, &args)
                     } else if let Some(x) = primitives::call(s, f, args) {
                         x
@@ -283,7 +284,7 @@ pub mod emit {
         strings::lift(&mut s, &prog);
         let prog = lang::rename(&prog);
 
-        let (codes, prog) = lambda::lift(&mut s, &prog);
+        let prog = lambda::lift(&mut s, &prog);
 
         let mut gen = x86::prelude() + x86::func(&x86::init()) + x86::enter() + x86::init_heap();
 
@@ -293,7 +294,7 @@ pub mod emit {
 
         gen += x86::leave();
         gen += strings::inline(&s);
-        gen += lambda::code(&mut s, codes);
+        gen += lambda::code(&mut s);
 
         gen.to_string()
     }

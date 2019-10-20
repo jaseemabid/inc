@@ -42,28 +42,15 @@ use crate::{
 // TODO:
 // 1. Ensure labels are unique
 //
-pub fn lift(s: &mut State, prog: &[Expr]) -> (Vec<Code>, Vec<Expr>) {
-    let mut codes: Vec<Code> = vec![];
-    let mut lifted: Vec<Expr> = Default::default();
-
-    for expr in prog {
-        let (c, e) = lift1(s, &expr);
-
-        codes.extend(c);
-        lifted.push(e);
-    }
-
-    (codes, lifted)
+pub fn lift(s: &mut State, prog: &[Expr]) -> Vec<Expr> {
+    prog.iter().map({ |expr| lift1(s, &expr) }).collect()
 }
 
 /// Lift an expression to top level
 ///
 /// Lift returns a list of definitions and an expression with inline lambdas and
 /// function definitions replaced with unique names.
-fn lift1(s: &mut State, prog: &Expr) -> (Vec<Code>, Expr) {
-    // Codes are all the function bodies found within this expression
-    let mut codes: Vec<Code> = vec![];
-
+fn lift1(s: &mut State, prog: &Expr) -> Expr {
     // Original expression with inline lambdas and declarations replaced
     let lifted: Expr = match prog {
         Let { bindings, body } => {
@@ -72,14 +59,11 @@ fn lift1(s: &mut State, prog: &Expr) -> (Vec<Code>, Expr) {
 
             for (name, value) in bindings {
                 match value {
-                    Lambda(Code { formals, free, body, .. }) => {
-                        s.functions.insert(name.to_string());
-                        codes.push(Code {
-                            name: Some(name.to_string()),
-                            formals: formals.to_vec(),
-                            free: free.to_vec(),
-                            body: body.to_vec(),
-                        });
+                    Lambda(c) => {
+                        s.functions.insert(
+                            name.to_string(),
+                            Code { name: Some(name.to_string()), ..c.clone() },
+                        );
                     }
 
                     _ => rest.push((name.clone(), value.clone())),
@@ -95,7 +79,7 @@ fn lift1(s: &mut State, prog: &Expr) -> (Vec<Code>, Expr) {
         _ => prog.clone(),
     };
 
-    (codes, lifted)
+    lifted
 }
 
 /// Function body for the simplest C style functions
@@ -112,11 +96,17 @@ fn lift1(s: &mut State, prog: &Expr) -> (Vec<Code>, Expr) {
 /// 32` etc. The function preamble effectively decrements the base pointer
 /// by `0x10` such that the such that the first argument can be accessed at
 /// `RBP - 8`, the next one at `RBP - 16` etc.
-pub fn code(s: &mut State, codes: Vec<Code>) -> ASM {
+pub fn code(s: &mut State) -> ASM {
     let mut asm = ASM(vec![]);
 
-    for Code { name, formals, body, .. } in &codes {
-        asm += x86::func(name.as_ref().unwrap().as_str());
+    // This clone is tricky and I don't understand it well enough. Iterating
+    // over `s.functions` takes ownership of `s` and borrow checker wont let us
+    // have a mutable `s` inside the body. An explicit clone here is a hack to
+    // get around it.
+    let codes = &(s.functions).clone();
+
+    for (name, Code { formals, body, .. }) in codes.iter() {
+        asm += x86::func(name.as_str());
 
         // Start a new lexical environment for the function, add the
         // formal arguments and leave when it is evaluated. The first
@@ -209,16 +199,16 @@ mod tests {
             Err(e) => panic!(e),
         };
 
-        let (codes, e) = lift(&mut s, &expr);
+        let e = lift(&mut s, &expr);
 
         assert_eq!(
-            codes,
-            vec![Code {
+            s.functions.get("id").unwrap(),
+            &Code {
                 name: Some("id".into()),
                 formals: vec!["x".into()],
                 free: vec![],
                 body: vec![("x".into())],
-            }]
+            }
         );
 
         assert_eq!(e[0], Let { bindings: vec![], body: vec![List(vec!["id".into(), Number(42)])] });
@@ -237,10 +227,10 @@ mod tests {
             Err(e) => panic!(e),
         };
 
-        let (codes, e) = lift(&mut s, &expr);
+        let e = lift(&mut s, &expr);
 
         assert_eq!(
-            codes.get(0).unwrap(),
+            s.functions.get("e").unwrap(),
             &Code {
                 name: Some("e".into()),
                 formals: vec!["x".into()],
@@ -257,7 +247,7 @@ mod tests {
         );
 
         assert_eq!(
-            codes.get(1).unwrap(),
+            s.functions.get("o").unwrap(),
             &Code {
                 name: Some("o".into()),
                 formals: vec!["x".into()],
