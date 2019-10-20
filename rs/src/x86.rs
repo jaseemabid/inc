@@ -403,7 +403,7 @@ impl AddAssign<Ins> for ASM {
 /// Syntax sugar for concatenating two ASM objects Ex: `asm += asm`
 impl AddAssign<ASM> for ASM {
     fn add_assign(&mut self, asm: ASM) {
-        self.0.extend(asm.0.clone())
+        self.0.extend(asm.0)
     }
 }
 
@@ -413,10 +413,9 @@ impl AddAssign<ASM> for ASM {
 impl Add<Ins> for ASM {
     type Output = Self;
 
-    fn add(self, op: Ins) -> Self {
-        let mut t = self.clone();
-        t.0.push(op);
-        t
+    fn add(mut self, op: Ins) -> Self {
+        self.0.push(op);
+        self
     }
 }
 
@@ -426,11 +425,9 @@ impl Add<Ins> for ASM {
 impl Add<ASM> for ASM {
     type Output = Self;
 
-    fn add(self, asm: ASM) -> Self {
-        let mut rhs = self.clone();
-        let mut lhs = asm.0.clone();
-        rhs.0.append(&mut lhs);
-        rhs
+    fn add(mut self, mut asm: ASM) -> Self {
+        self.0.append(&mut asm.0);
+        self
     }
 }
 
@@ -465,6 +462,7 @@ impl fmt::Display for Register {
     }
 }
 
+#[allow(clippy::comparison_chain)]
 impl fmt::Display for Relative {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.offset < 0 {
