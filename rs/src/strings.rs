@@ -34,14 +34,19 @@ use crate::{
     immediate,
     x86::{
         self, Ins, Reference,
-        Register::{self, *},
+        Register::{R12, RAX},
         ASM,
     },
 };
 
 /// Evaluate a string object
 pub fn eval(s: &State, data: &str) -> ASM {
-    address(s, &Expr::Str(data.into()), RAX)
+    let index = s
+        .symbols
+        .get(data)
+        .unwrap_or_else(|| panic!("String `{}` not found in symbol table", data));
+
+    x86::lea(RAX, &label(*index), immediate::STR).into()
 }
 
 /// Inline static strings in source directly into the binary
@@ -62,30 +67,6 @@ pub fn inline(s: &State) -> ASM {
     }
 
     asm
-}
-
-/// Get the address of a string object
-///
-/// If the argument is a string literal, the address is a label in the
-/// binary, if its a variable return the heap pointer instead.
-fn address(s: &State, t: &Expr, to: Register) -> ASM {
-    match t {
-        Expr::Str(tag) => {
-            let index = s
-                .symbols
-                .get(tag)
-                .unwrap_or_else(|| panic!("String `{}` not found in symbol table", tag));
-
-            x86::lea(to, &label(*index), immediate::STR).into()
-        }
-
-        Expr::Identifier(i) => match s.get(&i) {
-            Some(i) => x86::mov(to.into(), i.clone()).into(),
-            None => panic!("Undefined variable {}", i),
-        },
-
-        _ => panic!("expected string; got {:?}", t),
-    }
 }
 
 /// Label for inlining symbol
