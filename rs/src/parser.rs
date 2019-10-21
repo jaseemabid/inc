@@ -140,11 +140,7 @@ fn if_syntax(i: &str) -> IResult<&str, Expr> {
         close,
     ))(i)?;
 
-    let pred = Box::new(pred);
-    let then = Box::new(then);
-    let alt = if let Some((_, a)) = alt { Some(Box::new(a)) } else { None };
-
-    Ok((i, Expr::Cond { pred, then, alt }))
+    Ok((i, Expr::Cond { pred: box pred, then: box then, alt: alt.map({ |(_, a)| box a }) }))
 }
 
 /// variable is an identifier
@@ -491,28 +487,24 @@ mod tests {
     #[test]
     fn if_syntax() {
         let prog = "(if #t 12 13)";
-        let exp = Cond {
-            pred: Box::new(Boolean(true)),
-            then: Box::new(Number(12)),
-            alt: Some(Box::new(Number(13))),
-        };
+        let exp = Cond { pred: box true.into(), then: box 12.into(), alt: Some(box 13.into()) };
 
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(if #t 14)";
-        let exp = Cond { pred: Box::new(Boolean(true)), then: Box::new(Number(14)), alt: None };
+        let exp = Cond { pred: box true.into(), then: box 14.into(), alt: None };
 
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(if (zero? x) 1 (* x (f (dec x))))";
         let exp = Cond {
-            pred: Box::new(List(vec![("zero?".into()), ("x".into())])),
-            then: Box::new(Number(1)),
-            alt: Some(Box::new(List(vec![
-                ("*".into()),
-                ("x".into()),
-                List(vec![("f".into()), List(vec![("dec".into()), ("x".into())])]),
-            ]))),
+            pred: box List(vec!["zero?".into(), "x".into()]),
+            then: box 1.into(),
+            alt: Some(box List(vec![
+                "*".into(),
+                "x".into(),
+                List(vec!["f".into(), List(vec!["dec".into(), "x".into()])]),
+            ])),
         };
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -568,11 +560,7 @@ mod tests {
             name: None,
             formals: vec!["x".into()],
             free: vec![],
-            body: vec![Cond {
-                pred: Box::new(Boolean(true)),
-                then: Box::new(Number(1)),
-                alt: Some(Box::new(Number(2))),
-            }],
+            body: vec![Cond { pred: box true.into(), then: box 1.into(), alt: Some(box 2.into()) }],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -583,13 +571,13 @@ mod tests {
             formals: vec!["x".into()],
             free: vec![],
             body: vec![Cond {
-                pred: Box::new(List(vec![("zero?".into()), ("x".into())])),
-                then: Box::new(Number(1)),
-                alt: Some(Box::new(List(vec![
-                    ("*".into()),
-                    ("x".into()),
-                    List(vec![("f".into()), List(vec![("dec".into()), ("x".into())])]),
-                ]))),
+                pred: box List(vec![("zero?".into()), ("x".into())]),
+                then: box 1.into(),
+                alt: Some(box List(vec![
+                    "*".into(),
+                    "x".into(),
+                    List(vec!["f".into(), List(vec!["dec".into(), "x".into()])]),
+                ])),
             }],
         });
 

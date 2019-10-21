@@ -74,9 +74,9 @@ fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
         List(list) => List(list.iter().map(|l| mangle(env, l)).collect()),
 
         Cond { pred, then, alt } => Cond {
-            pred: Box::new(mangle(env, pred)),
-            then: Box::new(mangle(env, then)),
-            alt: alt.as_ref().map(|u| Box::new(mangle(env, u))),
+            pred: box mangle(env, pred),
+            then: box mangle(env, then),
+            alt: alt.as_ref().map(|u| box mangle(env, u)),
         },
 
         Lambda(Code { name, formals, free, body }) => Lambda(Code {
@@ -255,7 +255,7 @@ mod tests {
                 name: Some("id".into()),
                 formals: vec!["x".into()],
                 free: vec![],
-                body: vec![("x".into())],
+                body: vec!["x".into()],
             }
         );
 
@@ -284,12 +284,9 @@ mod tests {
                 formals: vec!["x".into()],
                 free: vec![],
                 body: vec![Cond {
-                    pred: Box::new(List(vec![("zero?".into()), ("x".into())])),
-                    then: Box::new(Boolean(true)),
-                    alt: Some(Box::new(List(vec![
-                        ("o".into()),
-                        List(vec![("dec".into()), ("x".into())])
-                    ])))
+                    pred: box List(vec!["zero?".into(), "x".into()]),
+                    then: box Boolean(true),
+                    alt: Some(box List(vec!["o".into(), List(vec!["dec".into(), "x".into()])]))
                 }]
             }
         );
@@ -301,19 +298,13 @@ mod tests {
                 formals: vec!["x".into()],
                 free: vec![],
                 body: vec![Cond {
-                    pred: Box::new(List(vec![("zero?".into()), ("x".into())])),
-                    then: Box::new(Boolean(false)),
-                    alt: Some(Box::new(List(vec![
-                        ("e".into()),
-                        List(vec![("dec".into()), ("x".into())])
-                    ])))
+                    pred: box List(vec!["zero?".into(), "x".into()]),
+                    then: box Boolean(false),
+                    alt: Some(box List(vec!["e".into(), List(vec!["dec".into(), "x".into()])]))
                 }]
             }
         );
 
-        assert_eq!(
-            e[0],
-            Let { bindings: vec![], body: vec![List(vec![("e".into()), Number(25)])] }
-        );
+        assert_eq!(e[0], Let { bindings: vec![], body: vec![List(vec!["e".into(), Number(25)])] });
     }
 }
