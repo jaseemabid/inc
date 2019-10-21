@@ -145,7 +145,7 @@ fn if_syntax(i: &str) -> IResult<&str, Expr> {
 
 /// variable is an identifier
 fn variable(i: &str) -> IResult<&str, Expr> {
-    map(identifier, { |i| Expr::Identifier(i) })(i)
+    map(identifier, Expr::Identifier)(i)
 }
 
 /// `<formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)`
@@ -169,10 +169,10 @@ fn body(i: &str) -> IResult<&str, Vec<Expr>> {
 fn constant(i: &str) -> IResult<&str, Expr> {
     alt((
         (map(tag("()"), { |_| Expr::Nil })),
-        (map(ascii, { |c| Expr::Char(c) })),
-        (map(boolean, { |b| Expr::Boolean(b) })),
-        (map(number, { |i| Expr::Number(i) })),
-        (map(string, { |i| Expr::Str(i) })),
+        (map(ascii, Expr::Char)),
+        (map(boolean, Expr::Boolean)),
+        (map(number, Expr::Number)),
+        (map(string, Expr::Str)),
     ))(i)
 }
 
@@ -263,11 +263,11 @@ fn digit(i: &str) -> IResult<&str, char> {
 fn datum(i: &str) -> IResult<&str, Expr> {
     alt((
         (map(tag("()"), { |_| Expr::Nil })),
-        (map(boolean, { |b| Expr::Boolean(b) })),
-        (map(ascii, { |c| Expr::Char(c) })),
-        (map(number, { |i| Expr::Number(i) })),
-        (map(identifier, { |i| Expr::Identifier(i) })),
-        (map(string, { |i| Expr::Str(i) })),
+        (map(boolean, Expr::Boolean)),
+        (map(ascii, Expr::Char)),
+        (map(number, Expr::Number)),
+        (map(identifier, Expr::Identifier)),
+        (map(string, Expr::Str)),
         list,
     ))(i)
 }
