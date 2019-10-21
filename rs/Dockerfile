@@ -9,7 +9,10 @@ RUN apt update && \
     apt install -y gdb gdbserver && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -s https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain nightly && \
+RUN curl -s https://sh.rustup.rs | sh -s -- -y \
+      --no-modify-path \
+      --profile minimal \
+      --default-toolchain nightly && \
     chmod -R a+w $RUSTUP_HOME $CARGO_HOME && \
     rustup --version && \
     cargo --version && \
