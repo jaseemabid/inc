@@ -25,7 +25,7 @@ pub mod state {
         pub si: i64,
         pub asm: ASM,
         li: u64,
-        pub symbols: HashMap<String, usize>,
+        pub strings: HashMap<String, usize>,
         pub functions: HashMap<String, Code>,
         env: Env,
     }
@@ -36,7 +36,7 @@ pub mod state {
                 si: -WORDSIZE,
                 asm: Default::default(),
                 li: 0,
-                symbols: HashMap::new(),
+                strings: HashMap::new(),
                 functions: HashMap::new(),
                 env: Default::default(),
             }

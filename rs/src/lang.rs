@@ -94,8 +94,8 @@ fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
 fn lift1(s: &mut State, prog: &Expr) -> Expr {
     match prog {
         Str(reference) => {
-            if !s.symbols.contains_key(reference) {
-                s.symbols.insert(reference.clone(), s.symbols.len());
+            if !s.strings.contains_key(reference) {
+                s.strings.insert(reference.clone(), s.strings.len());
             }
             Str(reference.clone())
         }

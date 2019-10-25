@@ -41,7 +41,7 @@ use crate::{
 /// Evaluate a string object
 pub fn eval(s: &State, data: &str) -> ASM {
     let index = s
-        .symbols
+        .strings
         .get(data)
         .unwrap_or_else(|| panic!("String `{}` not found in symbol table", data));
 
@@ -52,7 +52,7 @@ pub fn eval(s: &State, data: &str) -> ASM {
 pub fn inline(s: &State) -> ASM {
     let mut asm = ASM(vec![]);
 
-    for (symbol, index) in &s.symbols {
+    for (symbol, index) in &s.strings {
         // `.p2align 3` aligns the address of the following target to 8
         // bytes by setting the 3 low order bits to 0. This is necessary for
         // the immediate tagging scheme to work correctly.
