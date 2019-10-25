@@ -19,6 +19,7 @@ extern int64_t init(int64_t*) __attribute__((noinline));
 #define pairtag  3
 #define niltag   4
 #define strtag   5
+#define symtag   6
 
 #define shift    3
 #define mask     0b00000111
@@ -83,6 +84,14 @@ void print(int64_t val, bool nested) {
         fwrite((void *)str, 1, len, stdout);
         printf("\"");
 
+    } else if ((val & mask) == symtag) {
+        int64_t *p = (int64_t *)(val - symtag);
+        // int64_t id = *(p + 0);
+        int64_t len = *(p + 1);
+        int64_t *str = p + 2;
+
+        printf("'");
+        fwrite((void *)str, 1, len, stdout);
     } else {
         printf("ERROR; unknown value at reference %p \n", (uintptr_t *)val);
     }
@@ -150,4 +159,8 @@ int64_t string_length(int64_t val) {
     int64_t len = *(p + 0);
 
     return len * 8;
+}
+
+int64_t symbol_eq(int64_t a, int64_t b) {
+    return ((a == b) && (a & mask) == symtag) ? bool_t : bool_f;
 }

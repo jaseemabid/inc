@@ -385,6 +385,34 @@ mod strings {
     }
 }
 
+mod symbols {
+    use super::*;
+
+    #[test]
+    fn simple() {
+        let tests = [
+            ("'one", "'one"),
+            ("(boolean? 'yo)", "#f"),
+            ("(null? 'duh)", "#f"),
+            ("(string? 'blah)", "#f"),
+            ("(symbol? 'blah)", "#t"),
+        ];
+
+        test_many(&tests)
+    }
+
+    #[test]
+    fn args() {
+        test1("(if (zero? 1) 'yes 'nope)", "'nope")
+    }
+
+    #[test]
+    fn runtime() {
+        test1("(symbol=? 'one 'two)", "#f");
+        test1("(symbol=? 'woo 'woo)", "#t")
+    }
+}
+
 // Step 8 functions
 mod functions {
     use super::*;

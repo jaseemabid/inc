@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-const SYMBOLS: [&str; 2] = ["string-length", "exit"];
+const SYMBOLS: [&str; 3] = ["string-length", "symbol=?", "exit"];
 
 /// Call a function with System V calling convention
 ///
@@ -58,13 +58,15 @@ pub fn contains(name: &str) -> bool {
     SYMBOLS.contains(&name)
 }
 
-// On macos, function names must be prefixed an underscore like _init
+/// Translate scheme names into runtime names
+// 1. On macos, function names must be prefixed an underscore like _init
+// 2. Replace =? into _eq (symbol=? -> symbol_eq)
 #[cfg(target_os = "linux")]
 fn rename(name: &str) -> String {
-    name.replace("-", "_")
+    name.replace("-", "_").replace("=?", "_eq")
 }
 
 #[cfg(target_os = "macos")]
 fn rename(name: &str) -> String {
-    format!("_{}", name.replace("-", "_"))
+    format!("_{}", name.replace("-", "_").replace("=?", "_eq"))
 }

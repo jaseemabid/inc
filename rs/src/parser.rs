@@ -29,7 +29,7 @@ use std::str;
 /// <program>  → <form>*
 /// <form>     → <definition> | <expression>
 /// ```
-pub fn program(i: &str) -> IResult<&str, Vec<Expr>> {
+fn program(i: &str) -> IResult<&str, Vec<Expr>> {
     many1(delimited(space0, expression, space0))(i)
 }
 
@@ -115,7 +115,7 @@ fn binding(i: &str) -> IResult<&str, (String, Expr)> {
 /// <application> → (<expression> <expression>*)
 /// ```
 fn expression(i: &str) -> IResult<&str, Expr> {
-    alt((constant, variable, lambda_syntax, if_syntax, let_syntax, application))(i)
+    alt((constant, variable, quote, lambda_syntax, if_syntax, let_syntax, application))(i)
 }
 
 /// `(lambda <formals> <body>)`
@@ -163,6 +163,12 @@ fn body(i: &str) -> IResult<&str, Vec<Expr>> {
     let mut v = Vec::new();
     v.append(&mut es);
     Ok((i, v))
+}
+
+/// (quote <datum>) | '<datum>
+// Note: This parser only handles simple quoted symbols for now
+fn quote(i: &str) -> IResult<&str, Expr> {
+    map(tuple((tag("\'"), identifier)), { |(_, i)| Expr::Symbol(i) })(i)
 }
 
 /// `<constant> → <boolean> | <number> | <character> | <string>`
@@ -390,6 +396,9 @@ mod tests {
         // Identifiers must split at space and not consume anything
         // afterwards
         assert_eq!(partial(" b", String::from("a")), identifier("a b"));
+
+        // Quoted symbols are not identifiers
+        assert_eq!(partial("'woo", String::from("a")), identifier("a'woo"));
     }
 
     // #[test]
@@ -513,8 +522,19 @@ mod tests {
     #[test]
     fn application() {
         assert_eq!(ok(List(vec!["f".into(), "x".into()])), super::application("(f x)"));
-
         assert_eq!(ok(List(vec!["f".into()])), super::application("(f)"));
+    }
+
+    #[test]
+    fn quotes() {
+        let p = super::program("(symbol=? 'one 'two)");
+        let e = vec![List(vec![
+            Identifier("symbol=?".into()),
+            Symbol("one".into()),
+            Symbol("two".into()),
+        ])];
+
+        assert_eq!(ok(e), p);
     }
 
     #[test]

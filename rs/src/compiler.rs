@@ -26,6 +26,7 @@ pub mod state {
         pub asm: ASM,
         li: u64,
         pub strings: HashMap<String, usize>,
+        pub symbols: HashMap<String, usize>,
         pub functions: HashMap<String, Code>,
         env: Env,
     }
@@ -37,6 +38,7 @@ pub mod state {
                 asm: Default::default(),
                 li: 0,
                 strings: HashMap::new(),
+                symbols: HashMap::new(),
                 functions: HashMap::new(),
                 env: Default::default(),
             }
@@ -251,6 +253,8 @@ pub mod emit {
             // Find the symbol index and return and reference in RAX
             Str(data) => strings::eval(&s, &data),
 
+            Symbol(data) => symbols::eval(&s, &data),
+
             Let { bindings, body } => vars(s, bindings, body),
 
             Cond { pred, then, alt } => cond(s, pred, then, alt),
@@ -292,6 +296,7 @@ pub mod emit {
 
         gen += x86::leave();
         gen += strings::inline(&s);
+        gen += symbols::inline(&s);
         gen += lambda::code(&mut s);
 
         gen.to_string()

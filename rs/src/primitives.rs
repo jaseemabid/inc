@@ -34,6 +34,7 @@ pub fn call(s: &mut State, fname: &str, args: &[Expr]) -> Option<ASM> {
         ("null?", [arg]) => Some(nullp(s, arg)),
         ("pair?", [arg]) => Some(pairp(s, arg)),
         ("string?", [arg]) => Some(stringp(s, arg)),
+        ("symbol?", [arg]) => Some(symbolp(s, arg)),
         ("zero?", [arg]) => Some(zerop(s, arg)),
         _ => None,
     }
@@ -86,6 +87,11 @@ fn pairp(s: &mut State, expr: &Expr) -> ASM {
 /// Is the expression a string?
 fn stringp(s: &mut State, expr: &Expr) -> ASM {
     eval(s, expr) + mask() + compare(RAX.into(), immediate::STR.into(), "sete")
+}
+
+/// Is the expression a symbol?
+fn symbolp(s: &mut State, expr: &Expr) -> ASM {
+    eval(s, expr) + mask() + compare(RAX.into(), immediate::SYM.into(), "sete")
 }
 
 /// Is the expression zero?

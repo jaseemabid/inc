@@ -22,6 +22,8 @@ pub enum Expr {
     Str(String),
     // Scheme Identifiers
     Identifier(String),
+    // Symbols
+    Symbol(String),
     // Since Rust needs to know the size of the Expr type upfront, we need an
     // indirection here with `Vec<>` for recursive types. In this context, Vec
     // is just a convenient way to have a `Box<[Expr]>`
@@ -71,6 +73,7 @@ impl fmt::Display for Expr {
             Expr::Char(c) => write!(f, "{}", c),
             Expr::Str(s) => write!(f, "\"{}\"", s),
             Expr::Identifier(i) => write!(f, "{}", i),
+            Expr::Symbol(i) => write!(f, "'{}", i),
             Expr::List(l) => {
                 write!(f, "(")?;
                 for i in l {

@@ -100,6 +100,13 @@ fn lift1(s: &mut State, prog: &Expr) -> Expr {
             Str(reference.clone())
         }
 
+        Symbol(reference) => {
+            if !s.symbols.contains_key(reference) {
+                s.symbols.insert(reference.clone(), s.symbols.len());
+            }
+            Symbol(reference.clone())
+        }
+
         Let { bindings, body } => {
             // Rest is all the name bindings that are not functions
             let mut rest: Vec<(String, Expr)> = vec![];

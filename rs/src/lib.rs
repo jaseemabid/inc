@@ -152,4 +152,5 @@ pub mod parser;
 pub mod primitives;
 pub mod runtime;
 pub mod strings;
+pub mod symbols;
 pub mod x86;
