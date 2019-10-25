@@ -232,7 +232,7 @@ pub fn jmp(l: &str) -> Ins {
 
 /// A label is a target to jump to
 pub fn label(l: &str) -> Ins {
-    Ins(format!("{}:", l))
+    Ins(format!("\"{}\":", l))
 }
 
 /// Exit a function and clean up. See `Enter`
@@ -336,7 +336,7 @@ pub fn init() -> String {
 /// Emit code for a function header
 #[cfg(target_os = "macos")]
 pub fn func(name: &str) -> ASM {
-    Ins::from("") + Ins(format!(".globl {}", &name)) + label(name)
+    Ins::from("") + Ins(format!(".globl \"{}\"", &name)) + label(name)
 }
 
 #[cfg(target_os = "linux")]
