@@ -23,7 +23,8 @@
 # the generated asm.
 #
 
-CCFLAGS = -g -ggdb3 -m64 -Wall -Wpedantic -Wno-override-module -fno-asynchronous-unwind-tables -fomit-frame-pointer
+CCFLAGS = -g -ggdb3 -m64 -Wall -Wno-override-module -fno-asynchronous-unwind-tables -fomit-frame-pointer
+
 
 inc: runtime.c inc.s
 	gcc $(CCFLAGS) $^ -o inc

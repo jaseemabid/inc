@@ -4,8 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 // The default calling convention used by GCC on x86-64 seems to be System V
 // AMD64 ABI, in which arguments are passed in the registers RDI, RSI, RDX, RCX,
@@ -13,20 +13,20 @@
 // more details.
 extern int64_t init(int64_t*) __attribute__((noinline));
 
-#define numtag   0
-#define booltag  1
-#define chartag  2
-#define pairtag  3
-#define niltag   4
-#define strtag   5
-#define symtag   6
-#define vectag   7
+const int64_t numtag  = 0;
+const int64_t booltag = 1;
+const int64_t chartag = 2;
+const int64_t pairtag = 3;
+const int64_t niltag  = 4;
+const int64_t strtag  = 5;
+const int64_t symtag  = 6;
+const int64_t vectag  = 7;
 
-#define shift    3
-#define mask     0b00000111
+const int64_t shift   = 3;
+const int64_t mask    = 7;
 
-int64_t bool_f = (0 << shift) | booltag;
-int64_t bool_t = (1 << shift) | booltag;
+const int64_t bool_f  = (0 << shift) | booltag;
+const int64_t bool_t  = (1 << shift) | booltag;
 
 void print(int64_t val, bool nested) {
 
@@ -109,7 +109,7 @@ void print(int64_t val, bool nested) {
     }
 
     else {
-        printf("ERROR; unknown value at reference %p \n", (uintptr_t *)val);
+        printf("Runtime Error: unknown value returned: `%"PRId64" `\n", val);
     }
 }
 
@@ -153,10 +153,10 @@ int main() {
 
     ptrdiff_t size = (uintptr_t)r12 - (uintptr_t)heap;
 
-    fprintf(debug, "Stack base addr : %p \n", (uintptr_t *)rsp );
-    fprintf(debug, "Heap segment    : %p -> %p \n", heap, (int64_t *)r12);
+    fprintf(debug, "Stack base addr : %p\n", (void *)rsp );
+    fprintf(debug, "Heap segment    : %p" "-> %p \n", (void *)heap, (void *)r12);
     fprintf(debug, "Heap size       : %td bytes \n", size);
-    fprintf(debug, "Value in rax    : %" PRId64, val);
+    fprintf(debug, "Value in rax    : %" PRId64 " (0x%" PRIx64 ")", val,  val);
     fprintf(debug, "\n\n");
     fflush(stdout);
 
