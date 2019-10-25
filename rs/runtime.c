@@ -20,6 +20,7 @@ extern int64_t init(int64_t*) __attribute__((noinline));
 #define niltag   4
 #define strtag   5
 #define symtag   6
+#define vectag   7
 
 #define shift    3
 #define mask     0b00000111
@@ -92,7 +93,22 @@ void print(int64_t val, bool nested) {
 
         printf("'");
         fwrite((void *)str, 1, len, stdout);
-    } else {
+
+    } else if ((val & mask) == vectag) {
+        int64_t *p = (int64_t *)(val - vectag);
+        int64_t len = *p + 1;
+
+        printf("[");
+        for (int i = 1; i < len; i++) {
+            print(*(p + i), false);
+            if (i != len - 1) {
+                printf(" ");
+            }
+        }
+        printf("]");
+    }
+
+    else {
         printf("ERROR; unknown value at reference %p \n", (uintptr_t *)val);
     }
 }

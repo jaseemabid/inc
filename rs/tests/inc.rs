@@ -298,12 +298,12 @@ mod cond {
     }
 }
 
-// Step 7: Pairs in heap
+// Step 7: Heap allocated objects
 mod heap {
     use super::*;
 
     #[test]
-    fn simple() {
+    fn pairs() {
         let tests = [
             ("(pair? (cons 1 2))", "#t"),
             ("(pair? (cons 1 2))", "#t"),
@@ -344,72 +344,80 @@ mod heap {
 
         test_many(&tests)
     }
-}
 
-// Step 7.1: Strings
-mod strings {
-    use super::*;
+    mod strings {
+        use super::*;
 
-    #[test]
-    fn simple() {
-        let tests = [
-            ("\"Hello world !!\"", "\"Hello world !!\""),
-            ("(boolean? \"hello\")", "#f"),
-            ("(null? \"hello\")", "#f"),
-            ("(pair? \"hello\")", "#f"),
-            ("(string? \"hello\")", "#t"),
-            ("(string? #f)", "#f"),
-            ("(string? #t)", "#f"),
-            ("(string? ())", "#f"),
-            ("(string? (cons 1 2))", "#f"),
-            ("(string? 1287)", "#f"),
-            ("(make-string 0)", "\"\""),
-            ("(null? (make-string 4))", "#f"),
-            ("(string? (make-string 0))", "#t"),
-            ("(string? (make-string 4))", "#t"),
-        ];
+        #[test]
+        fn simple() {
+            let tests = [
+                ("\"Hello world !!\"", "\"Hello world !!\""),
+                ("(boolean? \"hello\")", "#f"),
+                ("(null? \"hello\")", "#f"),
+                ("(pair? \"hello\")", "#f"),
+                ("(string? \"hello\")", "#t"),
+                ("(string? #f)", "#f"),
+                ("(string? #t)", "#f"),
+                ("(string? ())", "#f"),
+                ("(string? (cons 1 2))", "#f"),
+                ("(string? 1287)", "#f"),
+                ("(make-string 0)", "\"\""),
+                ("(null? (make-string 4))", "#f"),
+                ("(string? (make-string 0))", "#t"),
+                ("(string? (make-string 4))", "#t"),
+            ];
 
-        test_many(&tests)
+            test_many(&tests)
+        }
+
+        #[test]
+        fn args() {
+            test1("(if (zero? 1) \"yes\" \"nope\")", "\"nope\"")
+        }
+
+        #[test]
+        fn runtime() {
+            test1("(string-length \"Hello world !!\")", "14");
+            test1("(string-length \"\")", "0");
+            test1("(string-length \"🐈\")", "4")
+        }
     }
 
-    #[test]
-    fn args() {
-        test1("(if (zero? 1) \"yes\" \"nope\")", "\"nope\"")
+    mod symbols {
+        use super::*;
+
+        #[test]
+        fn simple() {
+            let tests = [
+                ("'one", "'one"),
+                ("(boolean? 'yo)", "#f"),
+                ("(null? 'duh)", "#f"),
+                ("(string? 'blah)", "#f"),
+                ("(symbol? 'blah)", "#t"),
+            ];
+
+            test_many(&tests)
+        }
+
+        #[test]
+        fn args() {
+            test1("(if (zero? 1) 'yes 'nope)", "'nope")
+        }
+
+        #[test]
+        fn runtime() {
+            test1("(symbol=? 'one 'two)", "#f");
+            test1("(symbol=? 'woo 'woo)", "#t")
+        }
     }
 
-    #[test]
-    fn runtime() {
-        test1("(string-length \"Hello world !!\")", "14");
-        test1("(string-length \"\")", "0");
-        test1("(string-length \"🐈\")", "4")
-    }
-}
+    mod vector {
+        use super::*;
 
-mod symbols {
-    use super::*;
-
-    #[test]
-    fn simple() {
-        let tests = [
-            ("'one", "'one"),
-            ("(boolean? 'yo)", "#f"),
-            ("(null? 'duh)", "#f"),
-            ("(string? 'blah)", "#f"),
-            ("(symbol? 'blah)", "#t"),
-        ];
-
-        test_many(&tests)
-    }
-
-    #[test]
-    fn args() {
-        test1("(if (zero? 1) 'yes 'nope)", "'nope")
-    }
-
-    #[test]
-    fn runtime() {
-        test1("(symbol=? 'one 'two)", "#f");
-        test1("(symbol=? 'woo 'woo)", "#t")
+        #[test]
+        fn simple() {
+            test1("(vector 1 5 'one 'two \"DAMN\")", "[1 5 'one 'two \"DAMN\"]");
+        }
     }
 }
 

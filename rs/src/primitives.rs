@@ -6,7 +6,7 @@ use crate::{
     },
     core::*,
     immediate, strings,
-    x86::{self, Register::*, *},
+    x86::{self, Reference::*, Register::*, *},
 };
 
 pub fn call(s: &mut State, fname: &str, args: &[Expr]) -> Option<ASM> {
@@ -36,6 +36,7 @@ pub fn call(s: &mut State, fname: &str, args: &[Expr]) -> Option<ASM> {
         ("string?", [arg]) => Some(stringp(s, arg)),
         ("symbol?", [arg]) => Some(symbolp(s, arg)),
         ("zero?", [arg]) => Some(zerop(s, arg)),
+        ("vector", args) => Some(vector(s, args)),
         _ => None,
     }
 }
@@ -259,4 +260,26 @@ fn car(s: &mut State, pair: &Expr) -> ASM {
 fn cdr(s: &mut State, pair: &Expr) -> ASM {
     // Assert destination is really a pair ?
     eval(s, pair) + Ins(format!("mov rax, [rax + {}]    # (cdr ...)", 5))
+}
+
+/// Allocate a vector on heap
+fn vector(s: &mut State, exprs: &[Expr]) -> ASM {
+    // Vectors are length prefixed like strings
+    let mut asm: ASM = x86::mov(Relative(R12 + 0), Const(exprs.len() as i64)).into();
+
+    for (index, expr) in exprs.iter().enumerate() {
+        let dest = Relative(R12 + (WORDSIZE * (index + 1) as i64));
+
+        match immediate::to(expr) {
+            Some(c) => asm += x86::mov(dest, Reference::Const(c)),
+            None => asm += eval(s, expr) + x86::mov(dest, RAX.into()),
+        }
+    }
+
+    asm = asm
+        + x86::mov(RAX.into(), R12.into())
+        + x86::add(R12.into(), Const(WORDSIZE * exprs.len() as i64))
+        + x86::or(RAX.into(), immediate::VEC.into());
+
+    asm
 }
