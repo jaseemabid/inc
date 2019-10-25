@@ -25,7 +25,7 @@
 
 CCFLAGS = -g -ggdb3 -m64 -Wall -Wno-override-module -fno-asynchronous-unwind-tables -fomit-frame-pointer
 
-
+.DEFAULT_GOAL := inc
 inc: runtime.c inc.s
 	gcc $(CCFLAGS) $^ -o inc
 
@@ -42,7 +42,6 @@ docker:
 	docker build -t inc:latest .
 
 # Test inside the container
-.DEFAULT_GOAL := ctest
 .PHONY: ctest
 ctest: docker
 	docker run inc cargo test
