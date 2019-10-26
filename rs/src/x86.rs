@@ -342,8 +342,8 @@ pub fn func(name: &str) -> ASM {
 #[cfg(target_os = "linux")]
 pub fn func(name: &str) -> ASM {
     Ins::from("")
-        + Ins(format!(".globl {}", &name))
-        + Ins(format!(".type {}, @function", &name))
+        + Ins(format!(".globl \"{}\"", &name))
+        + Ins(format!(".type \"{}\", @function", &name))
         + label(name)
 }
 
