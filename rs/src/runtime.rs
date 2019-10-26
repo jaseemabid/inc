@@ -1,6 +1,7 @@
 //! Runtime functions implemented in C or ASM
 use crate::{
     compiler::{emit::eval, state::State},
+    immediate,
     core::Expr,
     x86::{
         self,
@@ -28,7 +29,7 @@ pub fn ffi(s: &mut State, name: &str, args: &[Expr]) -> ASM {
     for (i, arg) in args.iter().enumerate() {
         let target: Register = x86::SYS_V[i];
 
-        asm += match arg.unbox() {
+        asm += match immediate::to(arg) {
             Some(c) => x86::mov(Register(target), Const(c)).into(),
             None => eval(s, &arg) + x86::mov(Register(target), Register(RAX)),
         }
