@@ -31,7 +31,7 @@
 use crate::{
     compiler::{emit::eval, state::State},
     core::{Code, Expr},
-    x86::{self, Register::*, Relative, ASM, WORDSIZE},
+    x86::{self, Reference, Register::*, Relative, ASM, WORDSIZE},
 };
 
 /// Function body for the simplest C style functions
@@ -111,17 +111,28 @@ pub fn call(s: &mut State, name: &str, args: &[Expr]) -> ASM {
     // Set stack index back to where it used to be after evaluating all args
     s.si = si;
 
-    // Extend stack to hold the current local variables before creating a
-    // new frame for the function call. `si` is the next available empty
-    // slot, `(+ si wordsize)` is the current usage. Add this to `RSP` to
-    // reserve this space before the function gets called. Not doing this
-    // will result in the called function to override this space with its
-    // local variables and corrupt the stack.
-    let locals = s.si + WORDSIZE;
+    // Extend the current stack frame to hold the local variables before
+    // creating a new one. The called function might clobber the stack
+    // corrupting local variables in previous scopes.
+    //
+    // This is undeniably brittle and errors here can be hard to understand and
+    // debug. The behavior varies when the arguments are passed in stack for
+    // calling scheme functions and when calling runtime functions defined in C
+    // which expects args in registers.
+    //
+    // In case of stack calls, the aliment must be perfect or the called
+    // function would access the wrong local variables. For register calls, the
+    // stack only have to be bigger than a minimum size.
+    //
+    // In a very curious case, macOS segfaults when the stack is grown by 8
+    // bytes and I really cannot tell why because of the complete lack of
+    // debuggers - both GDB and valgrind. Allocating at least 16bytes seems to
+    // work on both targets.
+    let locals = -(s.si + WORDSIZE);
     if locals != 0 {
-        asm += x86::add(RSP.into(), locals.into());
+        asm += x86::sub(RSP.into(), Reference::Const(locals));
         asm += x86::call(name);
-        asm += x86::sub(RSP.into(), locals.into());
+        asm += x86::add(RSP.into(), Reference::Const(locals));
     } else {
         asm += x86::call(name)
     }

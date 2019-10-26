@@ -36,17 +36,11 @@ pub fn ffi(s: &mut State, name: &str, args: &[Expr]) -> ASM {
 
     let name = rename(name);
 
-    // Extend stack to hold the current local variables before creating a
-    // new frame for the function call. `si` is the next available empty
-    // slot, `(+ si wordsize)` is the current usage. Add this to `RSP` to
-    // reserve this space before the function gets called. Not doing this
-    // will result in the called function to override this space with its
-    // local variables and corrupt the stack.
-    let locals = s.si + WORDSIZE;
-    if locals != 0 {
-        asm += x86::add(RSP.into(), locals.into());
+    // See docs in `lambda:call` for details on how this works.
+    if s.si != -WORDSIZE {
+        asm += x86::sub(RSP.into(), Const(-s.si));
         asm += x86::call(&name);
-        asm += x86::sub(RSP.into(), locals.into());
+        asm += x86::add(RSP.into(), Const(-s.si));
     } else {
         asm += x86::call(&name)
     }
