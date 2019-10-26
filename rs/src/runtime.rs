@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-const SYMBOLS: [&str; 3] = ["string-length", "symbol=?", "exit"];
+const SYMBOLS: [&str; 5] = ["string-length", "symbol=?", "exit", "rt-open-write", "writeln"];
 
 /// Call a function with System V calling convention
 ///

@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -167,11 +169,13 @@ int main() {
 }
 
 /*
-  Tiny inline stdlib, easier to have it all in one file
+  Stdlib
+
+  Arguments and return values are immediate encoded
 */
 
 int64_t string_length(int64_t val) {
-    int64_t *p = (int64_t *)(val - 5);
+    int64_t *p = (int64_t *)(val - strtag);
     int64_t len = *(p + 0);
 
     return len * 8;
@@ -179,4 +183,59 @@ int64_t string_length(int64_t val) {
 
 int64_t symbol_eq(int64_t a, int64_t b) {
     return ((a == b) && (a & mask) == symtag) ? bool_t : bool_f;
+}
+
+/*
+  Internal definitions
+
+  A value of type `int64_t` is usually an immediate encoded value, and a pointer
+  type usually refers to raw data.
+*/
+
+
+/* Get raw values from immediate encoded values */
+int64_t get_int(int64_t val) {
+    assert ((val & mask) == numtag);
+
+    return val >> shift;
+}
+
+char* get_str(int64_t val) {
+    assert ((val & mask) == strtag);
+
+    int64_t *p = (int64_t *)(val - strtag);
+    int64_t *str = p + 1;
+
+    return (char *)str;
+}
+
+int64_t get_strlen(int64_t val) {
+    assert ((val & mask) == strtag);
+
+    int64_t *p = (int64_t *)(val - strtag);
+    return *p;
+}
+
+int64_t get_vec_nth(int64_t val, int n) {
+    int64_t *p = (int64_t *)(val - vectag);
+    return *(p + n);
+}
+
+/* IO helpers */
+
+int64_t rt_open_write(int64_t fname) {
+    char *name = get_str(fname);
+
+    int fd = open(name, O_WRONLY | O_CREAT | O_TRUNC, 0640);
+    return fd * 8;
+}
+
+int64_t writeln(int64_t str, int64_t port) {
+    int64_t fd = get_int(get_vec_nth(port, 3));
+    char* data = get_str(str);
+    int len = get_strlen(str);
+
+    write(fd, data, len);
+    write(fd, "\n", 1);
+    return niltag;
 }

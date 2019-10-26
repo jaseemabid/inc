@@ -505,6 +505,27 @@ mod functions {
     }
 }
 
+// Step 19, 20 & 21 - IO
+mod io {
+    use super::*;
+    use std::fs::read_to_string;
+
+    #[test]
+    fn write() {
+        let k = r#"
+            (let ((open-output-file (lambda (fname)
+                                     (let ((fd (rt-open-write fname)))
+                                      (vector 'port fname fd))))
+
+                  (f (open-output-file "/tmp/inc/io.txt")))
+
+             (writeln "hello world" f))"#;
+
+        test1(k, "()");
+        assert_eq!("hello world\n", read_to_string("/tmp/inc/io.txt").unwrap())
+    }
+}
+
 // Get a test config with program as input
 fn config(base_folder: &str, program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which
