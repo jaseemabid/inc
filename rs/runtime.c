@@ -30,19 +30,59 @@ const int64_t mask    = 7;
 const int64_t bool_f  = (0 << shift) | booltag;
 const int64_t bool_t  = (1 << shift) | booltag;
 
+/*
+  Stdlib
+
+  Arguments and return values are immediate encoded
+*/
+
+int64_t string_length(int64_t val);
+int64_t symbol_eq(int64_t a, int64_t b);
+
+/*
+  Internal definitions
+
+  A value of type `int64_t` is usually an immediate encoded value, and a pointer
+  type usually refers to raw data.
+*/
+
+char *get_str(int64_t val);
+char *get_sym_name(int64_t val);
+char get_char(int64_t val);
+int64_t get_num(int64_t val);
+int64_t get_pair_car(int64_t val);
+int64_t get_pair_cdr(int64_t val);
+int64_t get_strlen(int64_t val);
+int64_t get_sym_id(int64_t val);
+int64_t get_sym_len(int64_t val);
+int64_t get_vec_len(int64_t val);
+int64_t get_vec_nth(int64_t val, int n);
+
+/* IO helpers */
+
+int64_t rt_open_write(int64_t fname);
+int64_t writeln(int64_t str, int64_t port);
+
+/* --- */
+
 void print(int64_t val, bool nested) {
 
     if ((val & mask) == numtag) {
-        printf("%" PRId64, val >> shift);
+        printf("%" PRId64, get_num(val));
 
     } else if ((val & mask) == chartag) {
-        char c = val >> shift;
+        char c = get_char(val);
 
-        if      (c == '\t') printf("#\\tab");
-        else if (c == '\n') printf("#\\newline");
-        else if (c == '\r') printf("#\\return");
-        else if (c == ' ')  printf("#\\space");
-        else                printf("#\\%c", c);
+        if (c == '\t')
+            printf("#\\tab");
+        else if (c == '\n')
+            printf("#\\newline");
+        else if (c == '\r')
+            printf("#\\return");
+        else if (c == ' ')
+            printf("#\\space");
+        else
+            printf("#\\%c", c);
 
     } else if (val == bool_t) {
         printf("#t");
@@ -54,9 +94,8 @@ void print(int64_t val, bool nested) {
         printf("()");
 
     } else if ((val & mask) == pairtag) {
-        int64_t *p = (int64_t *)(val - pairtag);
-        int64_t car = *p;
-        int64_t cdr = *(p + 1);
+        int64_t car = get_pair_car(val);
+        int64_t cdr = get_pair_cdr(val);
 
         if (!nested) printf("(");
 
@@ -72,38 +111,24 @@ void print(int64_t val, bool nested) {
             }
         }
         if (!nested) printf(")");
+
     } else if ((val & mask) == strtag) {
-        // This is why C is unsafe, but that is exactly what is letting me do
-        // this sort of custom memory management.
-        //
         // A string in memory is a pair of length and a pointer to a blob of
         // bytes - ideally guaranteed by the compiler to be valid UTF-8. See
         // compiler module for documentation on the layout.
-        int64_t *p = (int64_t *)(val - strtag);
-        int64_t len = *(p + 0);
-        int64_t *str = p + 1;
-
         printf("\"");
-        fwrite((void *)str, 1, len, stdout);
+        fwrite(get_str(val), 1, get_strlen(val), stdout);
         printf("\"");
 
     } else if ((val & mask) == symtag) {
-        int64_t *p = (int64_t *)(val - symtag);
-        // int64_t id = *(p + 0);
-        int64_t len = *(p + 1);
-        int64_t *str = p + 2;
-
         printf("'");
-        fwrite((void *)str, 1, len, stdout);
+        fwrite(get_sym_name(val), 1, get_sym_len(val), stdout);
 
     } else if ((val & mask) == vectag) {
-        int64_t *p = (int64_t *)(val - vectag);
-        int64_t len = *p + 1;
-
         printf("[");
-        for (int i = 1; i < len; i++) {
-            print(*(p + i), false);
-            if (i != len - 1) {
+        for (int i = 0; i < get_vec_len(val); i++) {
+            print(get_vec_nth(val, i), false);
+            if (i != get_vec_len(val) - 1) {
                 printf(" ");
             }
         }
@@ -111,11 +136,11 @@ void print(int64_t val, bool nested) {
     }
 
     else {
-        printf("Runtime Error: unknown value returned: `%"PRId64" `\n", val);
+        printf("Runtime Error: unknown value returned: `%" PRId64 " `\n", val);
     }
 }
 
-void set_handler(void (*handler)(int,siginfo_t *,void *)) {
+void set_handler(void (*handler)(int, siginfo_t *, void *)) {
     struct sigaction action;
     action.sa_flags = SA_SIGINFO;
     action.sa_sigaction = handler;
@@ -126,10 +151,10 @@ void set_handler(void (*handler)(int,siginfo_t *,void *)) {
     }
 }
 
-void handler(int signo, siginfo_t *info,   __attribute__((unused)) void *extra) {
+void handler(int signo, siginfo_t *info, __attribute__((unused)) void *extra) {
     printf("Program crashed due to unexpected error \n");
     printf("Signal number        : %d \n", signo);
-    printf("SIGSEGV at address   : 0x%lx \n",(long) info->si_addr);
+    printf("SIGSEGV at address   : 0x%lx \n", (long)info->si_addr);
     abort();
 }
 
@@ -144,21 +169,21 @@ int main() {
     int64_t *heap = calloc(1024, 8);
 
     // Read current stack pointer into local variable for diagnostics
-    asm ("nop; movq %%rsp, %0" : "=r" (rsp));
+    asm("nop; movq %%rsp, %0" : "=r"(rsp));
 
     // Execute all of the generated ASM; this could return a value or segfault
     int64_t val = init(heap);
 
     // Copy the value of R12 into a local variable. The nop instruction makes it
     // easier to spot this in the generated asm
-    asm ("nop; movq %%r12, %0" : "=r" (r12));
+    asm("nop; movq %%r12, %0" : "=r"(r12));
 
     ptrdiff_t size = (uintptr_t)r12 - (uintptr_t)heap;
 
-    fprintf(debug, "Stack base addr : %p\n", (void *)rsp );
+    fprintf(debug, "Stack base addr : %p\n", (void *)rsp);
     fprintf(debug, "Heap segment    : %p" "-> %p \n", (void *)heap, (void *)r12);
     fprintf(debug, "Heap size       : %td bytes \n", size);
-    fprintf(debug, "Value in rax    : %" PRId64 " (0x%" PRIx64 ")", val,  val);
+    fprintf(debug, "Value in rax    : %" PRId64 " (0x%" PRIx64 ")", val, val);
     fprintf(debug, "\n\n");
     fflush(stdout);
 
@@ -192,16 +217,56 @@ int64_t symbol_eq(int64_t a, int64_t b) {
   type usually refers to raw data.
 */
 
-
 /* Get raw values from immediate encoded values */
-int64_t get_int(int64_t val) {
-    assert ((val & mask) == numtag);
+int64_t get_num(int64_t val) {
+    assert((val & mask) == numtag);
 
     return val >> shift;
 }
 
-char* get_str(int64_t val) {
-    assert ((val & mask) == strtag);
+char get_char(int64_t val) {
+    assert((val & mask) == chartag);
+
+    return val >> shift;
+}
+
+int64_t get_pair_car(int64_t val) {
+    assert((val & mask) == pairtag);
+
+    int64_t *p = (int64_t *)(val - pairtag);
+    return *p;
+}
+
+int64_t get_pair_cdr(int64_t val) {
+    assert((val & mask) == pairtag);
+
+    int64_t *p = (int64_t *)(val - pairtag);
+    return *(p + 1);
+}
+
+int64_t get_sym_id(int64_t val) {
+    assert((val & mask) == symtag);
+
+    int64_t *p = (int64_t *)(val - symtag);
+    return *p;
+}
+
+int64_t get_sym_len(int64_t val) {
+    assert((val & mask) == symtag);
+
+    int64_t *p = (int64_t *)(val - symtag);
+    return *(p + 1);
+}
+
+char *get_sym_name(int64_t val) {
+    assert((val & mask) == symtag);
+
+    int64_t *p = (int64_t *)(val - symtag);
+    return (char *)(p + 2);
+}
+
+char *get_str(int64_t val) {
+    assert((val & mask) == strtag);
 
     int64_t *p = (int64_t *)(val - strtag);
     int64_t *str = p + 1;
@@ -210,15 +275,22 @@ char* get_str(int64_t val) {
 }
 
 int64_t get_strlen(int64_t val) {
-    assert ((val & mask) == strtag);
+    assert((val & mask) == strtag);
 
     int64_t *p = (int64_t *)(val - strtag);
     return *p;
 }
 
+int64_t get_vec_len(int64_t val) {
+    assert((val & mask) == vectag);
+
+    int64_t *p = (int64_t *)(val - vectag);
+    return *p;
+}
+
 int64_t get_vec_nth(int64_t val, int n) {
     int64_t *p = (int64_t *)(val - vectag);
-    return *(p + n);
+    return *(p + n + 1);
 }
 
 /* IO helpers */
@@ -231,8 +303,8 @@ int64_t rt_open_write(int64_t fname) {
 }
 
 int64_t writeln(int64_t str, int64_t port) {
-    int64_t fd = get_int(get_vec_nth(port, 3));
-    char* data = get_str(str);
+    int64_t fd = get_num(get_vec_nth(port, 2));
+    char *data = get_str(str);
     int len = get_strlen(str);
 
     write(fd, data, len);
