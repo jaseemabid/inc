@@ -263,6 +263,8 @@ fn cdr(s: &mut State, pair: &Expr) -> ASM {
 }
 
 /// Allocate a vector on heap
+// Allows `R12 + 0`, its not ineffective
+#[allow(clippy::identity_op)]
 fn vector(s: &mut State, exprs: &[Expr]) -> ASM {
     // Vectors are length prefixed like strings
     let mut asm: ASM = x86::mov(Relative(R12 + 0), Const(exprs.len() as i64)).into();
