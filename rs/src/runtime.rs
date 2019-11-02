@@ -1,8 +1,8 @@
 //! Runtime functions implemented in C or ASM
 use crate::{
     compiler::{emit::eval, state::State},
-    immediate,
     core::Expr,
+    immediate,
     x86::{
         self,
         Reference::*,
@@ -11,7 +11,8 @@ use crate::{
     },
 };
 
-const SYMBOLS: [&str; 5] = ["string-length", "symbol=?", "exit", "rt-open-write", "writeln"];
+const SYMBOLS: [&str; 6] =
+    ["string-length", "symbol=?", "exit", "rt-open-write", "writeln", "type"];
 
 /// Call a function with System V calling convention
 ///

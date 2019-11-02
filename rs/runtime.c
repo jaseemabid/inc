@@ -210,6 +210,10 @@ int64_t symbol_eq(int64_t a, int64_t b) {
     return ((a == b) && (a & mask) == symtag) ? bool_t : bool_f;
 }
 
+int64_t type(int64_t a) {
+    return (a & mask) << shift;
+}
+
 /*
   Internal definitions
 
