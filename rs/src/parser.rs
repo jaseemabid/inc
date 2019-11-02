@@ -605,15 +605,19 @@ mod tests {
     }
 }
 
-/// Parse the input from user into the form the top level of the compiler
-/// understands.
-pub fn parse(i: &str) -> Result<Vec<Expr>, Error> {
+/// Parse a single expression for testing, return or panic
+#[cfg(test)]
+pub fn parse1<'a>(i: &'a str) -> Expr {
+    match expression(i) {
+        Ok((_rest, e)) => e,
+        Err(e) => panic!("Failed to parse `{}`: {:?}", i, e),
+    }
+}
+
+/// Parse the whole program
+pub fn parse<'a>(i: &'a str) -> Result<Vec<Expr>, Error<'a>> {
     match program(i) {
         Ok((_rest, expressions)) => Ok(expressions),
-        // Ok((EMPTY, ast)) => Ok(ast),
-        // Ok((_rest, _ast)) => Err(Error {
-        //     message: String::from("All of input not consumed"),
-        // }),
-        Err(e) => Err(Error { message: format!("{:?}", e) }),
+        Err(e) => Err(Error::Parser(e)),
     }
 }

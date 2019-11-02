@@ -150,111 +150,98 @@ fn lift1(s: &mut State, prog: &Expr) -> Expr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        core::{Error, Expr},
-        parser,
-        parser::parse,
-    };
+    use crate::{parser, parser::parse1};
     use pretty_assertions::assert_eq;
-
-    fn one(x: Result<Vec<Expr>, Error>) -> Expr {
-        x.unwrap()[0].clone()
-    }
 
     #[test]
     fn shadow1() {
-        let x = one(parse("(let ((x 1)) (let ((x 2)) (+ x x)))"));
-        let y = one(parse("(let ((x.0 1)) (let ((x.1 2)) (+ x.1 x.1)))"));
+        let x = parse1("(let ((x 1)) (let ((x 2)) (+ x x)))");
+        let y = parse1("(let ((x.0 1)) (let ((x.1 2)) (+ x.1 x.1)))");
 
         assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
     }
 
     #[test]
     fn shadow2() {
-        let x = one(parse("(let ((t (cons 1 2))) (let ((t t)) (let ((t t)) (let ((t t)) t))))"));
-        let y = one(parse(
+        let x = parse1("(let ((t (cons 1 2))) (let ((t t)) (let ((t t)) (let ((t t)) t))))");
+        let y = parse1(
             "(let ((t.0 (cons 1 2))) (let ((t.1 t.0)) (let ((t.2 t.1)) (let ((t.3 t.2)) t.3))))",
-        ));
+        );
 
         assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
     }
 
     #[test]
     fn shadow3() {
-        let x = one(parse(
+        let x = parse1(
             "(let ((x ()))
                (let ((x (cons x x)))
                  (let ((x (cons x x)))
                    (let ((x (cons x x)))
                      (cons x x)))))",
-        ));
+        );
 
-        let y = one(parse(
+        let y = parse1(
             "(let ((x.0 ()))
                (let ((x.1 (cons x.0 x.0)))
                  (let ((x.2 (cons x.1 x.1)))
                    (let ((x.3 (cons x.2 x.2)))
                      (cons x.3 x.3)))))",
-        ));
+        );
 
         assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
     }
 
     #[test]
     fn alias() {
-        let x = one(parse("(let ((x 1)) (let ((x x)) (+ x x)))"));
-        let y = one(parse("(let ((x.0 1)) (let ((x.1 x.0)) (+ x.1 x.1)))"));
+        let x = parse1("(let ((x 1)) (let ((x x)) (+ x x)))");
+        let y = parse1("(let ((x.0 1)) (let ((x.1 x.0)) (+ x.1 x.1)))");
 
         assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
     }
 
     #[test]
     fn letrec() {
-        let x = one(parse(
+        let x = parse1(
             "(let ((f (lambda (x) (g x x)))
                    (g (lambda (x y) (+ x y))))
                (f 12))",
-        ));
+        );
 
-        let y = one(parse(
+        let y = parse1(
             "(let ((f.0 (lambda (x) (g.0 x x)))
                    (g.0 (lambda (x y) (+ x y))))
                (f.0 12))",
-        ));
+        );
 
         assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
     }
 
     #[test]
     fn recursive() {
-        let x = one(parse(
+        let x = parse1(
             "(let ((f (lambda (x)
                         (if (zero? x)
                           1
                           (* x (f (dec x))))))) (f 5))",
-        ));
+        );
 
-        let y = one(parse(
+        let y = parse1(
             "(let ((f.0 (lambda (x)
                           (if (zero? x)
                             1
                             (* x (f.0 (dec x))))))) (f.0 5))",
-        ));
+        );
 
         assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
     }
 
     #[test]
     fn lift_simple() {
-        let prog = r"(let ((id (lambda (x) x))) (id 42))";
         let mut s: State = Default::default();
+        let expr = parse1(r"(let ((id (lambda (x) x))) (id 42))");
 
-        let expr = match parser::parse(prog) {
-            Ok(r) => r,
-            Err(e) => panic!(e),
-        };
-
-        let e = lift(&mut s, &expr);
+        let e = lift(&mut s, &[expr]);
 
         assert_eq!(
             s.functions.get("id").unwrap(),
