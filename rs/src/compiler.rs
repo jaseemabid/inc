@@ -282,7 +282,7 @@ pub mod emit {
     }
 
     /// Top level interface to the emit module
-    pub fn program(prog: Vec<Expr>) -> String {
+    pub fn program(prog: &[Expr]) -> String {
         let mut s: State = Default::default();
 
         let prog = lang::lift(&mut s, &prog);
