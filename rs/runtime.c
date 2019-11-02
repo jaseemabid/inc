@@ -200,10 +200,7 @@ int main() {
 */
 
 int64_t string_length(int64_t val) {
-    int64_t *p = (int64_t *)(val - strtag);
-    int64_t len = *(p + 0);
-
-    return len * 8;
+    return get_strlen(val) << shift;
 }
 
 int64_t symbol_eq(int64_t a, int64_t b) {
