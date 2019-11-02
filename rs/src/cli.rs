@@ -2,35 +2,61 @@
 
 use crate::{
     compiler::emit,
-    core::{Config, Expr},
-    parser,
+    core::{Config, Error, Expr},
+    parser::parse,
 };
 
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
-use std::process::Command;
+use std::{fs::File, io::Write, path::PathBuf, process::Command};
 
-/// Parse the program and return an Expr
-pub fn parse(config: &Config) -> Vec<Expr> {
-    parser::parse(&config.program).unwrap_or_else(|e| {
-        panic!("Failed to parse input program `{}`: {:?}", config.program, e.message)
-    })
+#[derive(Copy, Clone)]
+pub enum Action {
+    Parse,
+    GenASM,
+    Run,
 }
 
-/// Compile the program and write the assembly to target
-pub fn compile(config: &Config) -> Result<(), std::io::Error> {
-    let prog = parse(config);
+pub fn run(config: &Config, action: Action) -> Result<Option<String>, Error> {
+    let prog = parse(&config.program)?;
 
-    let mut handler = File::create(&config.asm())
-        .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
+    match action {
+        Action::Parse => {
+            for e in prog {
+                println!("{:?}", e);
+            }
 
-    handler.write_all(emit::program(prog).as_bytes())
+            Ok(None)
+        }
+        Action::GenASM => {
+            gen(config, &prog)?;
+
+            Ok(None)
+        }
+        Action::Run => {
+            gen(config, &prog)?;
+            build(&config)?;
+            exec(&config)
+        }
+    }
+}
+
+pub fn gen<'a>(config: &'a Config, prog: &[Expr]) -> Result<(), Error<'a>> {
+    let mut handler = File::create(&config.asm()).or_else(|e| {
+        Err(Error::Internal { message: format!("Failed to create {}", &config.asm()), e: Some(e) })
+    })?;
+
+    handler.write_all(emit::program(prog).as_bytes()).or_else(|e| {
+        Err(Error::Internal {
+            message: format!("Failed to write to {}", &config.asm()),
+            e: Some(e),
+        })
+    })?;
+
+    Ok(())
 }
 
 /// Build the generated ASM with clang into executable binary
-pub fn build(config: &Config) -> bool {
-    Command::new("gcc")
+pub fn build(config: &Config) -> Result<(), Error> {
+    let exe = Command::new("gcc")
         .arg("-m64")
         .arg("-g3")
         .arg("-ggdb3")
@@ -41,17 +67,26 @@ pub fn build(config: &Config) -> bool {
         .arg(&config.asm())
         .arg("-o")
         .arg(&config.output)
-        .status()
-        .expect("Failed to compile binary")
-        .success()
+        .output()
+        .expect("Failed to execute C compiler");
+
+    if exe.status.success() {
+        Ok(())
+    } else {
+        Err(Error::Internal {
+            message: format!(
+                "Failed to compile generated machine code. \n{}",
+                String::from_utf8_lossy(&exe.stderr)
+            ),
+            e: None,
+        })
+    }
 }
 
 /// Run the generated binary and return output
-pub fn run(config: &Config) -> Result<String, std::io::Error> {
-    let path = PathBuf::from(&config.output).canonicalize().unwrap();
-    let proc = Command::new(&path)
-        .output()
-        .unwrap_or_else(|e| panic!("Failed to run binary `{}`; error: `{}`", &path.display(), e));
+pub fn exec(config: &Config) -> Result<Option<String>, Error> {
+    let path = PathBuf::from(&config.output).canonicalize()?;
+    let exe = Command::new(&path).output()?;
 
-    Ok(String::from_utf8(proc.stdout).unwrap().trim().to_string())
+    Ok(Some(String::from_utf8_lossy(&exe.stdout).trim().to_string()))
 }

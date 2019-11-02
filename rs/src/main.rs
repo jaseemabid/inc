@@ -2,11 +2,17 @@ extern crate getopts;
 extern crate inc;
 
 use getopts::Options;
-use inc::{cli, core::Config};
-use std::env;
-use std::io::{self, Read};
+use inc::{
+    cli::{run, Action::*},
+    core::Config,
+};
+use std::{
+    env,
+    io::{self, Read},
+    process::exit,
+};
 
-fn main() -> Result<(), std::io::Error> {
+fn main() {
     let args: Vec<String> = env::args().collect();
     let bin = args[0].clone();
 
@@ -14,7 +20,6 @@ fn main() -> Result<(), std::io::Error> {
     opts.optopt("o", "", "Output file name", "FILE");
     opts.optflag("S", "", "Print generated asm");
     opts.optflag("p", "", "Print parse tree");
-    opts.optflag("P", "", "Dump raw parse tree");
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -22,49 +27,39 @@ fn main() -> Result<(), std::io::Error> {
         Err(f) => panic!(f.to_string()),
     };
 
-    if matches.opt_present("h") {
-        let brief = format!("Usage: {} [options]", bin);
-        print!("{}", opts.usage(&brief));
-        return Ok(());
+    let help = matches.opt_present("h");
+    let parse = matches.opt_present("p");
+    let asm = matches.opt_present("S");
+
+    if help {
+        print!("{}", opts.usage(&format!("Usage: {} [options]", bin)));
+        return;
     }
 
-    let exec = !matches.opt_present("S");
-    let output = if exec {
-        matches.opt_str("o").unwrap_or_else(|| String::from("inc"))
-    } else {
-        matches.opt_str("o").unwrap_or_else(|| String::from("/dev/stdout"))
-    };
+    let output = matches
+        .opt_str("o")
+        .unwrap_or_else(|| String::from(if asm { "/dev/stdout" } else { "inc" }));
 
     let mut program = String::new();
     io::stdin().read_to_string(&mut program).expect("Expected a program in stdin");
 
-    let config = Config { program, output, exec };
+    let config = Config { program, output };
 
-    // Dump pretty printed parse tree with `-p`
-    if matches.opt_present("p") {
-        let p = cli::parse(&config);
-        for e in p {
+    let action = if parse {
+        Parse
+    } else if asm {
+        GenASM
+    } else {
+        Run
+    };
+
+    // Run the entire CLI with config
+    match run(&config, action) {
+        Err(e) => {
             println!("{}", e);
+            exit(1)
         }
-        return Ok(());
+        Ok(Some(out)) => println!("{}", out),
+        Ok(None) => {}
     }
-
-    // Dump raw parse tree with `-P`
-    if matches.opt_present("P") {
-        let p = cli::parse(&config);
-        for e in p {
-            println!("{:?}", e);
-        }
-        return Ok(());
-    }
-
-    cli::compile(&config)?;
-
-    if config.exec {
-        cli::build(&config);
-        let out = cli::run(&config)?;
-        println!("{}", out);
-    }
-
-    Ok(())
 }

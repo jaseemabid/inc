@@ -4,6 +4,7 @@
 //! of this type.
 //!
 //! [`Expr`]: core::Expr
+use colored::Colorize;
 use std::fmt;
 
 /// Abstract Syntax Tree for a single expression
@@ -123,8 +124,6 @@ pub struct Config {
     pub program: String,
     /// Name of the generated asm and executable, stdout otherwise
     pub output: String,
-    /// Execute?
-    pub exec: bool,
 }
 
 impl Config {
@@ -138,13 +137,49 @@ impl Config {
     }
 }
 
-/// Custom error type for all of inc.
-// This might not be idiomatic Rust, revisit later.
-// https://doc.rust-lang.org/std/error/trait.Error.html
-// https://learning-rust.github.io/docs/e7.custom_error_types.html
-// https://doc.rust-lang.org/beta/rust-by-example/error/multiple_error_types/define_error_type.html
-// https://medium.com/@fredrikanderzon/custom-error-types-in-rust-and-the-operator-b499d0fb2925
+/// Custom error type for all of inc
+// See these links for more context on how custom error types work in Rust.
+// - https://learning-rust.github.io/docs/e7.custom_error_types.html
+// - https://rust-lang-nursery.github.io/cli-wg/tutorial/errors.html
 #[derive(Debug)]
-pub struct Error {
-    pub message: String,
+pub enum Error<'a> {
+    // Errors returned by nom
+    Parser(nom::Err<(&'a str, nom::error::ErrorKind)>),
+    // Internal errors are unexpected errors within the compiler
+    Internal { message: String, e: Option<std::io::Error> },
+    // Runtime errors in scheme like an undefined variable
+    Runtime(String),
+    // Compilation errors in Scheme like missing functions and type errors
+    Compilation(String),
+}
+
+// Implement std::convert::From for Error; from io::Error
+impl<'a> From<std::io::Error> for Error<'a> {
+    fn from(error: std::io::Error) -> Self {
+        Error::Internal { message: String::from(""), e: Some(error) }
+    }
+}
+
+impl<'a> fmt::Display for Error<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Parser(e) => {
+                writeln!(f, "{}\n", "Failed to parse program".red().bold())?;
+                writeln!(f, "{:?}", e)
+            }
+            Self::Internal { message, e } => {
+                writeln!(f, "{}\n", "Something went wrong!".red().bold())?;
+                writeln!(f, "{}", message)?;
+                writeln!(f, "{:?}", e)
+            }
+            Self::Runtime(e) => {
+                writeln!(f, "{}\n", "Runtime error!".red().bold())?;
+                writeln!(f, "{:?}", e)
+            }
+            Self::Compilation(e) => {
+                writeln!(f, "{}\n", "Failed to compile program".red().bold())?;
+                writeln!(f, "{:?}", e)
+            }
+        }
+    }
 }

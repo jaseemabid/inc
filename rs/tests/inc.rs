@@ -1,7 +1,7 @@
 // Integration tests
 extern crate inc;
 
-use inc::core::*;
+use inc::{cli, core::*};
 use rand::random;
 use std::{fs, panic};
 
@@ -533,13 +533,7 @@ fn config(base_folder: &str, program: String) -> Config {
     // messing things up.
     let output = format!("{}/inc", base_folder);
 
-    Config { program, output, exec: true }
-}
-
-// Build an executable with generated asm
-fn build(config: &Config) -> bool {
-    inc::cli::compile(&config).unwrap();
-    inc::cli::build(&config)
+    Config { program, output }
 }
 
 fn test_many(tests: &[(&str, &str)]) {
@@ -557,20 +551,14 @@ fn test1(input: &str, output: &str) {
 
     // Create a fresh config per run, this should allow for parallelism later.
     let config = config(&base_folder, input.to_string());
-
-    let result = panic::catch_unwind(|| {
-        // Rebuild before every run
-        assert!(build(&config));
-
-        // Run the generated binary and assert output
-        inc::cli::run(&config)
-    });
+    let result = cli::run(&config, cli::Action::Run);
 
     match result {
-        Err(e) => panic!("Failed to build `{}`: {:?}", input, e),
-        Ok(run) => {
-            assert_eq!(run.unwrap(), output, "Failed: {} != {}", input, output);
+        Ok(Some(result)) => {
+            assert_eq!(result, output, "Failed: {} != {}", input, output);
         }
+        Ok(None) => panic!("Test produced no output"),
+        Err(e) => panic!("{}", e),
     }
 
     // Clean up all the intermediary files generated
