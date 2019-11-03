@@ -58,7 +58,7 @@ pub fn code(s: &mut State) -> ASM {
     let codes = &(s.functions).clone();
 
     for (name, Code { formals, body, .. }) in codes.iter() {
-        asm += x86::func(name.as_str());
+        asm += x86::func(&name);
 
         // Start a new lexical environment for the function, add the
         // formal arguments and leave when it is evaluated. The first

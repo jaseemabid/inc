@@ -265,7 +265,7 @@ pub mod emit {
                         lambda::call(s, f, &args)
                     } else if let Some(x) = primitives::call(s, f, args) {
                         x
-                    } else if runtime::contains(f.as_str()) {
+                    } else if runtime::contains(&f) {
                         runtime::ffi(s, f, &args)
                     } else {
                         panic!("Unknown function {} called with args: {:?}", f, &args)

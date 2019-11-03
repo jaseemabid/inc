@@ -32,7 +32,7 @@ pub fn lift(s: &mut State, prog: &[Expr]) -> Vec<Expr> {
 // the bindings.
 fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
     match prog {
-        Identifier(i) => match env.get(i.as_str()) {
+        Identifier(i) => match env.get(i) {
             Some(n) => Identifier(format!("{}.{}", i, n)),
             None => Identifier(i.to_string()),
         },
