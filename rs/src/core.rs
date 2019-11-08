@@ -6,6 +6,7 @@
 //! [`Expr`]: core::Expr
 use colored::Colorize;
 use std::fmt;
+use nom::{self, Err};
 
 /// Abstract Syntax Tree for a single expression
 #[derive(Debug, PartialEq, Clone)]
@@ -165,6 +166,20 @@ impl<'a> fmt::Display for Error<'a> {
         match self {
             Self::Parser(e) => {
                 writeln!(f, "{}\n", "Failed to parse program".red().bold())?;
+
+
+                match e {
+                    Err::Incomplete(i) => {
+                        writeln!(f, "{} {:?} \n", "NOM incomplete", i)?;
+                    },
+                    Err::Error((_rest, kind)) => {
+                        writeln!(f, "{} {:?} {}  \n", "NOM err ", e     , nom::error::error_to_u32(kind) )?;
+                    },
+                    Err::Failure(e) => {
+                        writeln!(f, "{} {:?} \n", "NOM fai", e)?;
+                    },
+                }
+
                 writeln!(f, "{:?}", e)
             }
             Self::Internal { message, e } => {
