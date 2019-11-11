@@ -48,7 +48,7 @@ pub fn inline(s: &State) -> ASM {
         asm += x86::label(&label(*index));
         asm += Ins(format!(".quad  {}", index));
         asm += Ins(format!(".quad  {}", symbol.len()));
-        asm += Ins(format!(".ascii \"{}\"", symbol))
+        asm += Ins(format!(".asciz \"{}\"", symbol))
     }
 
     asm
