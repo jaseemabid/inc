@@ -8,7 +8,10 @@ description = "Incremental approach to compiler construction"
 repository  = "https://github.com/jaseemabid/inc"
 categories  = []
 keywords    = ["compiler", "x86", "scheme"]
-default-run = "inc"
+
+[[bin]]
+name = "ss"
+path = "src/main.rs"
 
 [dependencies]
 colored = "^1.8.0"
