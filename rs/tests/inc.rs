@@ -511,6 +511,18 @@ mod io {
     use std::fs::read_to_string;
 
     #[test]
+    fn fd() {
+        let k = r#"
+            (let ((open-output-file (lambda (fname)
+                                     (let ((fd (rt-open-write fname)))
+                                      (vector 'port fname fd)))))
+
+             (open-output-file "/tmp/inc/io.txt"))"#;
+
+        test1(k, r#"['port "/tmp/inc/io.txt" 4]"#);
+    }
+
+    #[test]
     fn write() {
         let k = r#"
             (let ((open-output-file (lambda (fname)
