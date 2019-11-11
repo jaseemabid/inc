@@ -150,6 +150,7 @@ pub mod lambda;
 pub mod lang;
 pub mod parser;
 pub mod primitives;
+pub mod rt;
 pub mod runtime;
 pub mod strings;
 pub mod symbols;

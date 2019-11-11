@@ -27,7 +27,11 @@ CCFLAGS = -g -ggdb3 -m64 -Wall -Wno-override-module -fno-asynchronous-unwind-tab
 
 .DEFAULT_GOAL := inc
 inc: runtime.c inc.s
-	gcc $(CCFLAGS) $^ -o inc
+	clang -L./target/debug -linc -ldl -lpthread  $(CCFLAGS) $^ -o inc
+
+# cargo install --force cbindgen
+inc.h: src
+	cbindgen -l C --crate inc --output inc.h
 
 .PHONY: test
 test:

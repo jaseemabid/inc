@@ -9,6 +9,10 @@ repository  = "https://github.com/jaseemabid/inc"
 categories  = []
 keywords    = ["compiler", "x86", "scheme"]
 
+[lib]
+crate_type = ["dylib", "rlib"]
+path       = "src/lib.rs"
+
 [[bin]]
 name = "ss"
 path = "src/main.rs"

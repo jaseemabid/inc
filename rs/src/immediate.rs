@@ -25,8 +25,9 @@ pub const VEC: i64 = 7;
 pub const SHIFT: i64 = 3;
 pub const MASK: i64 = 0b0000_0111;
 
-pub const FALSE: i64 = (0 << SHIFT) | BOOL;
-pub const TRUE: i64 = (1 << SHIFT) | BOOL;
+// cbindgen only understands simple constants
+pub const FALSE: i64 = 1; // (0 << SHIFT) | BOOL;
+pub const TRUE: i64 = 9; // (1 << SHIFT) | BOOL;
 
 /// Immediate representation of an expression.
 pub fn to(prog: &Expr) -> Option<i64> {

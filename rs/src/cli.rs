@@ -62,6 +62,10 @@ pub fn build(config: &Config) -> Result<(), Error> {
         .arg("-ggdb3")
         .arg("-fomit-frame-pointer")
         .arg("-fno-asynchronous-unwind-tables")
+        .arg("-L./target/debug")
+        .arg("-linc")
+        .arg("-ldl")
+        .arg("-lpthread")
         .arg("-O0")
         .arg("runtime.c")
         .arg(&config.asm())
@@ -84,6 +88,9 @@ pub fn build(config: &Config) -> Result<(), Error> {
 }
 
 /// Run the generated binary and return output
+// Cargo automatically sets the LD_LIBRARY_PATH, which is really convenient here
+// because the generated binary is dynamically linked to an artifact in the
+// target folder.
 pub fn exec(config: &Config) -> Result<Option<String>, Error> {
     let path = PathBuf::from(&config.output).canonicalize()?;
     let exe = Command::new(&path).output()?;
