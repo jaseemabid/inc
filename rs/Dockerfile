@@ -18,16 +18,7 @@ RUN curl -s https://sh.rustup.rs | sh -s -- -y \
     cargo --version && \
     rustc --version;
 
-# http://whitfin.io/speeding-up-rust-docker-builds
-RUN USER=root cargo new --bin /inc
 WORKDIR /inc
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./Cargo.toml ./Cargo.toml
-RUN touch src/lib.rs
-
-RUN cargo build --tests
-
-RUN rm src/*.rs
 ADD . /inc
 
 RUN cargo build --tests --lib --bins
