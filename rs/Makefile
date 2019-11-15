@@ -39,6 +39,7 @@ test:
 .PHONY: clean
 clean:
 	rm -f a.out inc inc.s inc-*
+	cargo clean
 
 .PHONY: docker
 docker:
