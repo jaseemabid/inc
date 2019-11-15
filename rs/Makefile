@@ -22,12 +22,11 @@
 # `-fno-asynchronous-unwind-tables` gets rid of all the '.cfi' directives from
 # the generated asm.
 #
-
-CCFLAGS = -g -ggdb3 -m64 -Wall -Wno-override-module -fno-asynchronous-unwind-tables -fomit-frame-pointer
+CFLAGS = -g -ggdb3 -m64 -Wall -Wno-override-module -fno-asynchronous-unwind-tables -fomit-frame-pointer
 
 .DEFAULT_GOAL := inc
 inc: runtime.c inc.s
-	clang -L./target/debug -linc -ldl -lpthread  $(CCFLAGS) $^ -o inc
+	$(CC) -L./target/debug $(CFLAGS) $^ -linc -ldl -lpthread -o inc
 
 # cargo install --force cbindgen
 inc.h: src
