@@ -23,6 +23,7 @@ RUN USER=root cargo new --bin /inc
 WORKDIR /inc
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
+RUN touch src/lib.rs
 
 RUN cargo build --tests
 
