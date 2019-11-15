@@ -30,4 +30,4 @@ RUN cargo build --tests
 RUN rm src/*.rs
 ADD . /inc
 
-RUN cargo build --tests
+RUN cargo build --tests --lib --bins
