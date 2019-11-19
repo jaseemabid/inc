@@ -1,9 +1,4 @@
 //! Core types shared by most of the program
-//!
-//! An [`Expr`] is a single statement in the program. The parser returns a list
-//! of this type.
-//!
-//! [`Expr`]: core::Expr
 use colored::Colorize;
 use std::fmt;
 
