@@ -2,12 +2,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <uchar.h>
 
 #define BOOL 1
 
 #define CHAR 2
 
-#define FALSE 1
+#define FALSE (0 << SHIFT) | BOOL
 
 #define MASK 7
 
@@ -23,7 +24,7 @@
 
 #define SYM 6
 
-#define TRUE 9
+#define TRUE (1 << SHIFT) | BOOL
 
 #define VEC 7
 
