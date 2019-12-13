@@ -1,5 +1,4 @@
 #![feature(slice_patterns, box_syntax, box_patterns)]
-
 /*!
 
 # An Incremental scheme compiler
@@ -16,12 +15,12 @@ Read the first few sections of the paper to understand the premise.
 There is a lot of C, Rust and x86 assembly here and these are some good places
 to start learning them.
 
-- [x86 module documentation](./x86/index.html) contains links to a few good x86 tutorials.
+- [x86 module documentation](crate::x86) contains links to a few good x86 tutorials.
 - [How to C in 2016](https://matt.sh/howto-c) is a pretty good C refresher.
 - [The Rust Programming language][book] book is a good place to start learning rust.
 
-This project also uses a lot of iterators, so [Effectively
-Using Iterators In Rust][iter] might be useful as well
+This project also uses a lot of iterators, so [Effectively Using Iterators In
+Rust][iter] might be useful as well
 
 ## Misc
 
@@ -151,7 +150,7 @@ pub mod lang;
 pub mod parser;
 pub mod primitives;
 pub mod rt;
-pub mod runtime;
+pub mod ffi;
 pub mod strings;
 pub mod symbols;
 pub mod x86;

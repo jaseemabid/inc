@@ -1,7 +1,7 @@
-//! Runtime functions implemented in Rust!
+//! Scheme runtime for Incremental
 //!
-//! All functions in this module are available to the C/ASM runtime and ideally
-//! all runtime functions and helpers must be exported via this module.
+//! Low level runtime functions for memory management, object layout, low level
+//! bit fiddling etc.
 
 use crate::{immediate::*, x86::WORDSIZE};
 use std::{
@@ -10,6 +10,15 @@ use std::{
     io::{self, Write},
     os::{raw::c_char, unix::io::AsRawFd},
 };
+
+/// Checks if a function is defined in the built in runtime
+pub fn defined(name: &str) -> bool {
+    SYMBOLS.contains(&name)
+}
+
+// All symbols exported to the runtime from this module
+const SYMBOLS: [&str; 6] = ["string-length", "symbol=?", "exit",
+    "rt-open-write", "writeln", "type"];
 
 #[no_mangle]
 pub extern "C" fn print(val: i64, nested: bool) {
