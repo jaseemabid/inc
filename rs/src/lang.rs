@@ -1,4 +1,4 @@
-//! Core lang transformations that understand Scheme language idiosyncrasies
+//! Scheme language transformations & idiosyncrasies
 //!
 //! Home for renaming, lifting, type checks and everything else.
 use crate::{

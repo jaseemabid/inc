@@ -1,4 +1,4 @@
-//! Inc Compiler
+//! Entry point for the Inc compiler
 
 /// State for the code generator
 pub mod state {

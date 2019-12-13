@@ -1,4 +1,4 @@
-//! Foreign function interface for Inc
+//! Foreign Function Interface for Inc
 //!
 //! This module enable Scheme functions to call into Rust/C functions
 //! seamlessly.

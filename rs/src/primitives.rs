@@ -1,4 +1,17 @@
-//! Scheme functions implemented within the compiler rather than the runtime.
+//! Scheme primitives implemented within the compiler.
+//!
+//! Scheme primitives naively understood by the compiler like
+//! [car](primitives::car) and [cdr](primitives::cdr) are implemented in this
+//! module.
+//!
+//! Preferably a function should be defined in the scheme stdlib, if not
+//! possible it should be written as a foreign function in Rust or C.
+//! Implementing primitives in assembly within the compiler itself should be
+//! used only as a last resort when the other options are significantly harder.
+//!
+//! Now this is not the stance the paper takes, but a compiler that is 100s of
+//! tiny functions that emit assembly as string is going to be a nightmare to
+//! work with.
 use crate::{
     compiler::{
         emit::{eval, mask},

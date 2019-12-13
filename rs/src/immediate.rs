@@ -1,4 +1,4 @@
-//! Runtime representation of typed scheme values
+//! Runtime representation of scheme objects
 //!
 //! Immediate values (values that can be fit in one machine word) are tagged for
 //! distinguising them from heap allocated pointers. The last 3 bits effectively
