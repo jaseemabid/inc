@@ -1,4 +1,4 @@
-# An incremental scheme compiler [![Build Status][tbadge]][travis] [![Docs][dbadge]][docs]
+# An incremental scheme compiler [![Build Status][tbadge]][travis] [![Docs][dbadge]][docs] [![](https://meritbadge.herokuapp.com/inc)](https://crates.io/crates/inc)
 
 A tiny scheme to x86 asm compiler developed incrementally as described in the
 paper [An Incremental Approach to Compiler Construction][paper] by Abdulaziz
