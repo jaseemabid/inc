@@ -301,4 +301,43 @@ mod tests {
 
         assert_eq!(e[0], Let { bindings: vec![], body: vec![List(vec!["e".into(), Number(25)])] });
     }
+
+    #[test]
+    fn tco() {
+        let mut s: State = Default::default();
+        let expr = parse1(
+            "(let ((factorial (lambda (x acc)
+                                (if (zero? x)
+                                  acc
+                                  (factorial (dec x) (* x acc))))))
+             (factorial 42 1))",
+        );
+        let e = lift1(&mut s, &expr);
+
+        assert_eq!(
+            s.functions.get("factorial").unwrap(),
+            &Code {
+                name: Some("factorial".into()),
+                formals: vec!["x".into(), "acc".into()],
+                free: vec![],
+                body: vec![Cond {
+                    pred: box List(vec!["zero?".into(), "x".into()],),
+                    then: box "acc".into(),
+                    alt: Some(box List(vec![
+                        "factorial".into(),
+                        List(vec!["dec".into(), "x".into()]),
+                        List(vec!["*".into(), "x".into(), "acc".into()]),
+                    ],),),
+                }]
+            }
+        );
+
+        assert_eq!(
+            e,
+            Let {
+                bindings: vec![],
+                body: vec![List(vec!["factorial".into(), Number(42), Number(1)])]
+            }
+        );
+    }
 }
