@@ -2,7 +2,7 @@
 
 /// State for the code generator
 pub mod state {
-    use crate::core::Code;
+    use crate::core::{Code, Ident};
     use crate::x86::{Reference, ASM, WORDSIZE};
     use std::collections::HashMap;
 
@@ -56,12 +56,12 @@ pub mod state {
             self.env.leave()
         }
 
-        pub fn get(&self, i: &str) -> Option<&Reference> {
+        pub fn get(&self, i: &Ident) -> Option<&Reference> {
             self.env.get(i)
         }
 
         // Set a new binding in the current local environment
-        pub fn set(&mut self, i: &str, r: Reference) {
+        pub fn set(&mut self, i: Ident, r: Reference) {
             self.env.set(i, r);
             self.alloc();
         }
@@ -94,7 +94,7 @@ pub mod state {
         }
     }
     // Environment is an *ordered* list of bindings.
-    struct Env(Vec<HashMap<String, Reference>>);
+    struct Env(Vec<HashMap<Ident, Reference>>);
 
     impl Default for Env {
         fn default() -> Self {
@@ -111,11 +111,11 @@ pub mod state {
             self.0.remove(0);
         }
 
-        pub fn set(&mut self, i: &str, r: Reference) {
-            self.0.first_mut().map(|binding| binding.insert(i.to_string(), r));
+        pub fn set(&mut self, i: Ident, r: Reference) {
+            self.0.first_mut().map(|binding| binding.insert(i, r));
         }
 
-        pub fn get(&self, i: &str) -> Option<&Reference> {
+        pub fn get(&self, i: &Ident) -> Option<&Reference> {
             for bindings in &self.0 {
                 if let Some(t) = bindings.get(i) {
                     return Some(t);
@@ -136,28 +136,28 @@ pub mod state {
             assert_eq!(e.0.len(), 1);
 
             // default global scope
-            e.set("x", Reference::from(-8));
-            assert_eq!(e.get("x"), Some(&Reference::from(-8)));
+            e.set(Ident::from("x"), Reference::from(-8));
+            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-8)));
 
             // overwrite in current scope
-            e.set("x", Reference::from(Reference::from(-16)));
-            assert_eq!(e.get("x"), Some(&Reference::from(-16)));
+            e.set(Ident::from("x"), Reference::from(Reference::from(-16)));
+            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-16)));
 
             e.enter();
             assert_eq!(e.0.len(), 2);
             // read variables from parent scope
-            assert_eq!(e.get("x"), Some(&Reference::from(-16)));
+            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-16)));
 
-            e.set("y", Reference::from(-24));
+            e.set(Ident::from("y"), Reference::from(-24));
             // local variable shadows global
-            e.set("x", Reference::from(-32));
-            assert_eq!(e.get("x"), Some(&Reference::from(-32)));
+            e.set(Ident::from("x"), Reference::from(-32));
+            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-32)));
 
             e.leave();
 
             assert_eq!(e.0.len(), 1);
-            assert_eq!(e.get("y"), None);
-            assert_eq!(e.get("x"), Some(&Reference::from(-16)));
+            assert_eq!(e.get(&Ident::from("y")), None);
+            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-16)));
         }
     }
 }
@@ -171,7 +171,10 @@ pub mod state {
 pub mod emit {
     use crate::{
         compiler::state::State,
-        core::Expr::{self, *},
+        core::{
+            Expr::{self, *},
+            Ident,
+        },
         x86::{self, Ins, Reference, Register::*, Relative, ASM},
         *,
     };
@@ -189,19 +192,19 @@ pub mod emit {
     /// stays the same before and after a let expression. There is no need to
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
-    pub fn vars(s: &mut State, vars: &[(String, Expr)], body: &[Expr]) -> ASM {
+    pub fn vars(s: &mut State, vars: &[(Ident, Expr)], body: &[Expr]) -> ASM {
         let mut asm = ASM(vec![]);
 
         s.enter();
 
-        for (name, expr) in vars {
+        for (ident, expr) in vars {
             match immediate::to(expr) {
                 Some(c) => asm += x86::save(Reference::Const(c), s.si),
                 None => asm += eval(s, expr) + x86::save(RAX.into(), s.si),
             }
 
             let r = Relative { register: RBP, offset: s.si };
-            s.set(name, r.into());
+            s.set(ident.clone(), r.into());
         }
 
         for b in body {
@@ -245,9 +248,9 @@ pub mod emit {
     #[allow(clippy::redundant_pattern)]
     pub fn eval(s: &mut State, prog: &Expr) -> ASM {
         match prog {
-            Identifier(i) => match s.get(i) {
-                Some(i) => x86::mov(RAX.into(), i.clone()).into(),
-                None => panic!("Undefined variable {}", i),
+            Identifier(i) => match s.get(&i) {
+                Some(index) => x86::mov(RAX.into(), index.clone()).into(),
+                None => panic!("Undefined variable {}", i.name),
             },
 
             // Find the symbol index and return and reference in RAX
@@ -260,15 +263,15 @@ pub mod emit {
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
-                [Identifier(f), args @ ..] => {
-                    if s.functions.contains_key(f) {
-                        lambda::call(s, f, &args)
-                    } else if let Some(x) = primitives::call(s, f, args) {
+                [Identifier(Ident { name, .. }), args @ ..] => {
+                    if s.functions.contains_key(name) {
+                        lambda::call(s, name, &args)
+                    } else if let Some(x) = primitives::call(s, &name, args) {
                         x
-                    } else if rt::defined(&f) {
-                        ffi::call(s, f, &args)
+                    } else if rt::defined(name) {
+                        ffi::call(s, name, &args)
                     } else {
-                        panic!("Unknown function {} called with args: {:?}", f, &args)
+                        panic!("Unknown function {} called with args: {:?}", name, &args)
                     }
                 }
                 _ => panic!("Unknown expression: `{}`", prog),

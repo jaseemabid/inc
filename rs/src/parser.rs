@@ -80,11 +80,11 @@ fn let_syntax(i: &str) -> IResult<&str, Expr> {
 }
 
 /// `named → (name value)`
-fn binding(i: &str) -> IResult<&str, (String, Expr)> {
+fn binding(i: &str) -> IResult<&str, (Ident, Expr)> {
     let (i, (_, name, _, value, _, _)) =
         tuple((open, identifier, space1, expression, close, space0))(i)?;
 
-    Ok((i, (name, value)))
+    Ok((i, (Ident::from(name), value)))
 }
 
 /// Core expressions
@@ -145,7 +145,7 @@ fn if_syntax(i: &str) -> IResult<&str, Expr> {
 
 /// variable is an identifier
 fn variable(i: &str) -> IResult<&str, Expr> {
-    map(identifier, Expr::Identifier)(i)
+    map(identifier, |name| Expr::Identifier(Ident::from(name)))(i)
 }
 
 /// `<formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)`
@@ -272,7 +272,7 @@ fn datum(i: &str) -> IResult<&str, Expr> {
         (map(boolean, Expr::Boolean)),
         (map(ascii, Expr::Char)),
         (map(number, Expr::Number)),
-        (map(identifier, Expr::Identifier)),
+        (map(identifier, |name| Expr::Identifier(Ident::from(name)))),
         (map(string, Expr::Str)),
         list,
     ))(i)
@@ -473,15 +473,15 @@ mod tests {
         let p2 = "(let ((x 1)) (let ((x 2)) #t) x)";
 
         let e1 = Let {
-            bindings: vec![("x".to_string(), Number(1)), ("y".to_string(), Number(2))],
-            body: vec![List(vec![("+".into()), ("x".into()), ("y".into())])],
+            bindings: vec![(Ident::from("x"), Number(1)), (Ident::from("y"), Number(2))],
+            body: vec![List(vec![("+".into()), (Expr::from("x")), (Expr::from("y"))])],
         };
 
         let e2 = Let {
-            bindings: vec![("x".to_string(), Number(1))],
+            bindings: vec![(Ident::from("x"), Number(1))],
             body: vec![
-                Let { bindings: vec![("x".to_string(), Number(2))], body: vec![true.into()] },
-                "x".into(),
+                Let { bindings: vec![(Ident::from("x"), Number(2))], body: vec![true.into()] },
+                Expr::from("x"),
             ],
         };
 
@@ -528,11 +528,7 @@ mod tests {
     #[test]
     fn quotes() {
         let p = super::program("(symbol=? 'one 'two)");
-        let e = vec![List(vec![
-            Identifier("symbol=?".into()),
-            Symbol("one".into()),
-            Symbol("two".into()),
-        ])];
+        let e = vec![List(vec!["symbol=?".into(), Symbol("one".into()), Symbol("two".into())])];
 
         assert_eq!(ok(e), p);
     }

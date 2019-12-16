@@ -17,7 +17,7 @@ pub enum Expr {
     // UTF-8 Strings
     Str(String),
     // Scheme Identifiers
-    Identifier(String),
+    Identifier(Ident),
     // Symbols
     Symbol(String),
     // Since Rust needs to know the size of the Expr type upfront, we need an
@@ -27,9 +27,34 @@ pub enum Expr {
     // Conditional
     Cond { pred: Box<Expr>, then: Box<Expr>, alt: Option<Box<Expr>> },
     // Variable bindings
-    Let { bindings: Vec<(String, Expr)>, body: Vec<Expr> },
+    Let { bindings: Vec<(Ident, Expr)>, body: Vec<Expr> },
     // Functions
     Lambda(Code),
+}
+
+/// Ident is a refinement type for an identifier
+// Rather than rely on a symbol table to store the metadata of an
+// identifier, store them inline within the AST.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct Ident {
+    //  User defined name of the variable
+    pub name: String,
+    // Disambiguate the same name. Eg, a0, a1, a2
+    pub index: i64,
+}
+
+impl Ident {
+    pub fn new<S: Into<String>>(name: S, index: i64) -> Self {
+        Self { name: name.into(), index }
+    }
+
+    pub fn from<S: Into<String>>(name: S) -> Self {
+        match name.into().split(".").collect::<Vec<&str>>().as_slice() {
+            [name, index] => Self { name: name.to_string(), index: index.parse::<i64>().unwrap() },
+            [name] => Self { name: name.to_string(), index: 0 },
+            _ => unreachable!(),
+        }
+    }
 }
 
 /// Code is a refinement type for Expression specialized for lambdas
@@ -46,6 +71,13 @@ pub struct Code {
 }
 
 /// Pretty print an Expr
+impl fmt::Display for Ident {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let Ident { name, index } = self;
+        write!(f, "{}.{}", name, index)
+    }
+}
+
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -54,7 +86,7 @@ impl fmt::Display for Expr {
             Expr::Boolean(t) => write!(f, "{}", if *t { "#t" } else { "#f" }),
             Expr::Char(c) => write!(f, "{}", c),
             Expr::Str(s) => write!(f, "\"{}\"", s),
-            Expr::Identifier(i) => write!(f, "{}", i),
+            Expr::Identifier(Ident { name, index }) => write!(f, "{}.{}", name, index),
             Expr::Symbol(i) => write!(f, "'{}", i),
             Expr::List(l) => {
                 write!(f, "(")?;
@@ -109,7 +141,7 @@ impl From<char> for Expr {
 
 impl From<&str> for Expr {
     fn from(i: &str) -> Self {
-        Expr::Identifier(String::from(i))
+        Expr::Identifier(Ident::from(i))
     }
 }
 

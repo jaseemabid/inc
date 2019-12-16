@@ -30,7 +30,7 @@
 //! SysV at some point.
 use crate::{
     compiler::{emit::eval, state::State},
-    core::{Code, Expr},
+    core::{Code, Expr, Ident},
     x86::{self, Reference, Register::*, Relative, ASM, WORDSIZE},
 };
 
@@ -69,7 +69,10 @@ pub fn code(s: &mut State) -> ASM {
         s.enter();
 
         for (i, arg) in formals.iter().enumerate() {
-            s.set(&arg, Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into());
+            s.set(
+                Ident::new(arg, 0),
+                Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into(),
+            );
         }
 
         for b in body {

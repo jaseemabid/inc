@@ -6,6 +6,7 @@ use crate::{
     core::{
         Code,
         Expr::{self, *},
+        Ident,
     },
 };
 
@@ -24,7 +25,7 @@ pub fn lift(s: &mut State, prog: &[Expr]) -> Vec<Expr> {
     prog.iter().map({ |expr| lift1(s, &expr) }).collect()
 }
 
-/// Mangle a single expression with letrec support.
+/// Rename/mangle all references to unique names
 ///
 // A sub expression in let binding is evaluated with the complete environment
 // including the one being defined only if the subexpresison captures the
@@ -32,24 +33,24 @@ pub fn lift(s: &mut State, prog: &[Expr]) -> Vec<Expr> {
 // the bindings.
 fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
     match prog {
-        Identifier(i) => match env.get(i) {
-            Some(n) => Identifier(format!("{}.{}", i, n)),
-            None => Identifier(i.to_string()),
+        Identifier(ident) => match env.get(&ident.name) {
+            Some(n) => Identifier(Ident::new(ident.name.clone(), *n)),
+            None => Identifier(ident.clone()),
         },
 
         Let { bindings, body } => {
             // Collect all the names about to be bound for evaluating body
             let mut all = env.clone();
-            for (name, _) in bindings {
-                all.entry(name.into()).and_modify(|e| *e += 1).or_insert(0);
+            for (ident, _index) in bindings.iter() {
+                all.entry(ident.name.clone()).and_modify(|e| *e += 1).or_insert(0);
             }
 
-            let bindings = bindings.iter().map(|(name, value)| {
+            let bindings = bindings.iter().map(|(current, value)| {
                 // Collect all the names excluding the one being defined now
                 let mut rest = env.clone();
-                for (n, _) in bindings {
-                    if n != name {
-                        rest.entry(n.into()).and_modify(|e| *e += 1).or_insert(0);
+                for (ident, _) in bindings {
+                    if ident != current {
+                        rest.entry(ident.name.clone()).and_modify(|e| *e += 1).or_insert(0);
                     }
                 }
 
@@ -59,10 +60,10 @@ fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
                     _ => mangle(&rest, value),
                 };
 
-                let index = all.get(name).unwrap();
-                let name = format!("{}.{}", name, index);
+                let ident =
+                    Ident { index: *all.get(&current.name).unwrap(), name: current.name.clone() };
 
-                (name, value)
+                (ident, value)
             });
 
             Let {
@@ -109,21 +110,21 @@ fn lift1(s: &mut State, prog: &Expr) -> Expr {
 
         Let { bindings, body } => {
             // Rest is all the name bindings that are not functions
-            let mut rest: Vec<(String, Expr)> = vec![];
+            let mut rest: Vec<(Ident, Expr)> = vec![];
 
-            for (name, expr) in bindings {
+            for (ident, expr) in bindings {
                 match expr {
                     Lambda(Code { formals, free, body, .. }) => {
                         let code = Code {
-                            name: Some(name.to_string()),
+                            name: Some(ident.name.to_string()),
                             formals: formals.clone(),
                             free: free.clone(),
                             body: lift(s, body),
                         };
-                        s.functions.insert(name.to_string(), code);
+                        s.functions.insert(ident.name.to_string(), code);
                     }
 
-                    _ => rest.push((name.clone(), lift1(s, expr))),
+                    _ => rest.push((ident.clone(), lift1(s, expr))),
                 };
             }
 
@@ -211,7 +212,7 @@ mod tests {
         let y = parse1(
             "(let ((f.0 (lambda (x) (g.0 x x)))
                    (g.0 (lambda (x y) (+ x y))))
-               (f.0 12))",
+               (f 12))",
         );
 
         assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
