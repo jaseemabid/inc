@@ -17,8 +17,8 @@ pub fn defined(name: &str) -> bool {
 }
 
 // All symbols exported to the runtime from this module
-const SYMBOLS: [&str; 6] = ["string-length", "symbol=?", "exit",
-    "rt-open-write", "writeln", "type"];
+const SYMBOLS: [&str; 6] =
+    ["string-length", "symbol=?", "exit", "rt-open-write", "writeln", "type"];
 
 #[no_mangle]
 pub extern "C" fn print(val: i64, nested: bool) {

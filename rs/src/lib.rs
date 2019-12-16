@@ -37,14 +37,14 @@ See [docs](docs) for some additional notes and comments.
 pub mod cli;
 pub mod compiler;
 pub mod core;
+pub mod docs;
+pub mod ffi;
 pub mod immediate;
 pub mod lambda;
 pub mod lang;
 pub mod parser;
 pub mod primitives;
 pub mod rt;
-pub mod ffi;
 pub mod strings;
 pub mod symbols;
 pub mod x86;
-pub mod docs;
