@@ -155,7 +155,7 @@ pub fn tco(s: &mut State) {
     /// Check if a code block can be tail call optimized
     fn is_tail(code: &Code) -> bool {
         // Get the expression in tail call position
-        let exp = code.body.last().map(tail).flatten();
+        let exp = code.body.last().and_then(tail);
 
         // Check if the tail call is a list and the first elem is an identifier
         match exp {
@@ -185,10 +185,10 @@ pub fn tco(s: &mut State) {
 fn tail(e: &Expr) -> Option<&Expr> {
     match e {
         // Lambda(Code { body, .. }) => body.last().map(tail).flatten(),
-        Let { body, .. } => body.last().map(tail).flatten(),
+        Let { body, .. } => body.last().and_then(tail),
         Cond { alt, .. } => {
             // What do I do with 2?
-            alt.as_ref().map(|box e| tail(&e)).flatten()
+            alt.as_ref().and_then(|box e| tail(&e))
         }
         e => Some(e),
     }
@@ -372,7 +372,7 @@ mod tests {
 
         assert_eq!(code.tail, false);
         assert_eq!(
-            code.body.last().map(tail).flatten().unwrap(),
+            code.body.last().and_then(tail).unwrap(),
             &List(vec![
                 "factorial".into(),
                 List(vec!["dec".into(), "x".into()]),
