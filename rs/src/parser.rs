@@ -123,7 +123,7 @@ fn lambda_syntax(i: &str) -> IResult<&str, Expr> {
     let (i, (_, _, _, formals, _, body, _, _)) =
         tuple((open, tag("lambda"), space1, formals, space0, body, space0, close))(i)?;
 
-    Ok((i, Expr::Lambda(Code { name: None, formals, body, free: vec![] })))
+    Ok((i, Expr::Lambda(Code { name: None, tail: false, formals, body, free: vec![] })))
 }
 
 /// `(if <expression> <expression> <expression>) | (if <expression> <expression>)`
@@ -536,13 +536,20 @@ mod tests {
     #[test]
     fn lambda_syntax() {
         let prog = "(lambda () 1)";
-        let exp = Lambda(Code { name: None, formals: vec![], body: vec![Number(1)], free: vec![] });
+        let exp = Lambda(Code {
+            name: None,
+            tail: false,
+            formals: vec![],
+            body: vec![Number(1)],
+            free: vec![],
+        });
 
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(lambda (a b ) a)";
         let exp = Lambda(Code {
             name: None,
+            tail: false,
             formals: vec!["a".into(), "b".into()],
             free: vec![],
             body: vec![("a".into())],
@@ -554,6 +561,7 @@ mod tests {
         let prog = "(lambda (a b) (+ b a))";
         let exp = Lambda(Code {
             name: None,
+            tail: false,
             free: vec![],
             formals: vec!["a".into(), "b".into()],
             body: vec![Expr::List(vec!["+".into(), "b".into(), "a".into()])],
@@ -564,6 +572,7 @@ mod tests {
         let prog = "(lambda a a)";
         let exp = Lambda(Code {
             name: None,
+            tail: false,
             formals: vec!["a".into()],
             free: vec![],
             body: vec![("a".into())],
@@ -574,6 +583,7 @@ mod tests {
         let prog = "(lambda (x) (if #t 1 2))";
         let exp = Lambda(Code {
             name: None,
+            tail: false,
             formals: vec!["x".into()],
             free: vec![],
             body: vec![Cond { pred: box true.into(), then: box 1.into(), alt: Some(box 2.into()) }],
@@ -584,6 +594,7 @@ mod tests {
         let prog = "(lambda (x) (if (zero? x) 1 (* x (f (dec x)))))";
         let exp = Lambda(Code {
             name: None,
+            tail: false,
             formals: vec!["x".into()],
             free: vec![],
             body: vec![Cond {

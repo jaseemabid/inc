@@ -80,8 +80,9 @@ fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
             alt: alt.as_ref().map(|u| box mangle(env, u)),
         },
 
-        Lambda(Code { name, formals, free, body }) => Lambda(Code {
+        Lambda(Code { name, tail, formals, free, body }) => Lambda(Code {
             name: name.clone(),
+            tail: *tail,
             formals: formals.clone(),
             free: free.clone(),
             body: body.iter().map(|b| mangle(env, b)).collect(),
@@ -114,9 +115,10 @@ fn lift1(s: &mut State, prog: &Expr) -> Expr {
 
             for (ident, expr) in bindings {
                 match expr {
-                    Lambda(Code { formals, free, body, .. }) => {
+                    Lambda(Code { formals, free, body, tail, .. }) => {
                         let code = Code {
                             name: Some(ident.name.to_string()),
+                            tail: *tail,
                             formals: formals.clone(),
                             free: free.clone(),
                             body: lift(s, body),
@@ -145,6 +147,50 @@ fn lift1(s: &mut State, prog: &Expr) -> Expr {
         Lambda(Code { .. }) => unimplemented!("inline λ"),
 
         e => e.clone(),
+    }
+}
+
+// Annotate tail calls with a marker
+pub fn tco(s: &mut State) {
+    /// Check if a code block can be tail call optimized
+    fn is_tail(code: &Code) -> bool {
+        // Get the expression in tail call position
+        let exp = code.body.last().map(tail).flatten();
+
+        // Check if the tail call is a list and the first elem is an identifier
+        match exp {
+            Some(List(l)) => match l.first() {
+                Some(Identifier(Ident { name, .. })) => code.name.as_ref() == Some(name),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    for (_, code) in s.functions.iter_mut() {
+        code.tail = is_tail(code)
+    }
+}
+
+/// Return the tail position of the expression
+///
+/// A tail position is defined recursively as follows:
+///
+/// 1. The body of a procedure is in tail position.
+/// 2. If a let expression is in tail position, then the body of the let is in
+///    tail position.
+/// 3. If the conditional expression (if test conseq altern) is in tail
+///    position, then the conseq and altern branches are also in tail position.
+/// 4. All other expressions are not in tail position.
+fn tail(e: &Expr) -> Option<&Expr> {
+    match e {
+        // Lambda(Code { body, .. }) => body.last().map(tail).flatten(),
+        Let { body, .. } => body.last().map(tail).flatten(),
+        Cond { alt, .. } => {
+            // What do I do with 2?
+            alt.as_ref().map(|box e| tail(&e)).flatten()
+        }
+        e => Some(e),
     }
 }
 
@@ -251,6 +297,7 @@ mod tests {
                 formals: vec!["x".into()],
                 free: vec![],
                 body: vec!["x".into()],
+                tail: false
             }
         );
 
@@ -276,11 +323,13 @@ mod tests {
             s.functions.get("e").unwrap(),
             &Code {
                 name: Some("e".into()),
+                tail: false,
                 formals: vec!["x".into()],
                 free: vec![],
                 body: vec![Cond {
                     pred: box List(vec!["zero?".into(), "x".into()]),
                     then: box Boolean(true),
+
                     alt: Some(box List(vec!["o".into(), List(vec!["dec".into(), "x".into()])]))
                 }]
             }
@@ -290,6 +339,8 @@ mod tests {
             s.functions.get("o").unwrap(),
             &Code {
                 name: Some("o".into()),
+
+                tail: false,
                 formals: vec!["x".into()],
                 free: vec![],
                 body: vec![Cond {
@@ -304,8 +355,9 @@ mod tests {
     }
 
     #[test]
-    fn tco() {
+    fn tails() {
         let mut s: State = Default::default();
+
         let expr = parse1(
             "(let ((factorial (lambda (x acc)
                                 (if (zero? x)
@@ -313,32 +365,22 @@ mod tests {
                                   (factorial (dec x) (* x acc))))))
              (factorial 42 1))",
         );
-        let e = lift1(&mut s, &expr);
 
+        lift1(&mut s, &expr);
+
+        let code = s.functions.get("factorial").unwrap().clone();
+
+        assert_eq!(code.tail, false);
         assert_eq!(
-            s.functions.get("factorial").unwrap(),
-            &Code {
-                name: Some("factorial".into()),
-                formals: vec!["x".into(), "acc".into()],
-                free: vec![],
-                body: vec![Cond {
-                    pred: box List(vec!["zero?".into(), "x".into()],),
-                    then: box "acc".into(),
-                    alt: Some(box List(vec![
-                        "factorial".into(),
-                        List(vec!["dec".into(), "x".into()]),
-                        List(vec!["*".into(), "x".into(), "acc".into()]),
-                    ],),),
-                }]
-            }
+            code.body.last().map(tail).flatten().unwrap(),
+            &List(vec![
+                "factorial".into(),
+                List(vec!["dec".into(), "x".into()]),
+                List(vec!["*".into(), "x".into(), "acc".into()]),
+            ])
         );
 
-        assert_eq!(
-            e,
-            Let {
-                bindings: vec![],
-                body: vec![List(vec!["factorial".into(), Number(42), Number(1)])]
-            }
-        );
+        tco(&mut s);
+        assert_eq!(s.functions.get("factorial").unwrap().clone().tail, true);
     }
 }

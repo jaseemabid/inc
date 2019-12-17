@@ -68,12 +68,14 @@ pub struct Code {
     pub free: Vec<String>,
     // A body is a list of expressions evaluated in order
     pub body: Vec<Expr>,
+    // Is this a tail call?
+    pub tail: bool,
 }
 
 /// Pretty print an Expr
 impl fmt::Display for Ident {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Ident { name, index } = self;
+        let Ident { name, index, .. } = self;
         write!(f, "{}.{}", name, index)
     }
 }
@@ -106,8 +108,13 @@ impl fmt::Display for Expr {
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
-            Expr::Lambda(Code { formals, body, .. }) => {
-                write!(f, "(λ (")?;
+            Expr::Lambda(Code { formals, body, tail, .. }) => {
+                if *tail {
+                    write!(f, "(^λ^ (")?;
+                } else {
+                    write!(f, "(λ (")?;
+                }
+
                 formals.iter().for_each(|arg| write!(f, "{}", arg).unwrap());
                 write!(f, ") ")?;
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
