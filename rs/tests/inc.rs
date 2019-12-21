@@ -505,6 +505,24 @@ mod functions {
     }
 }
 
+// Step 9, TCO
+mod tco {
+    use super::*;
+
+    // This test wont actually blow up the stack ever. 20! will overflow i64,
+    // but a stack of that depth is trivial to work with.
+    #[test]
+    fn factorial() {
+        let expr = "(let ((factorial (lambda (x acc)
+                                (if (zero? x)
+                                  acc
+                                  (factorial (dec x) (* x acc))))))
+             (factorial 10 1))";
+
+        test1(expr, "3628800");
+    }
+}
+
 // Step 19, 20 & 21 - IO
 mod io {
     use super::*;
