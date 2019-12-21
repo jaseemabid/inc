@@ -1,4 +1,5 @@
 #![feature(slice_patterns, box_syntax, box_patterns)]
+#![feature(inner_deref)] // For Option::as_deref
 /*!
 # An Incremental scheme compiler
 

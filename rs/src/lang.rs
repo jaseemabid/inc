@@ -140,7 +140,7 @@ fn lift1(s: &mut State, prog: &Expr) -> Expr {
         Cond { pred, then, alt } => Cond {
             pred: box lift1(s, pred),
             then: box lift1(s, then),
-            alt: alt.as_ref().map({ |box e| box lift1(s, &e) }),
+            alt: alt.as_deref().map({ |e| box lift1(s, &e) }),
         },
 
         // A literal lambda must be in an inline calling position
@@ -188,7 +188,7 @@ fn tail(e: &Expr) -> Option<&Expr> {
         Let { body, .. } => body.last().and_then(tail),
         Cond { alt, .. } => {
             // What do I do with 2?
-            alt.as_ref().and_then(|box e| tail(&e))
+            alt.as_deref().and_then(|e| tail(&e))
         }
         e => Some(e),
     }
