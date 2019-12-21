@@ -49,7 +49,7 @@ impl Ident {
     }
 
     pub fn from<S: Into<String>>(name: S) -> Self {
-        match name.into().split(".").collect::<Vec<&str>>().as_slice() {
+        match name.into().split('.').collect::<Vec<&str>>().as_slice() {
             [name, index] => Self { name: name.to_string(), index: index.parse::<i64>().unwrap() },
             [name] => Self { name: name.to_string(), index: 0 },
             _ => unreachable!(),
