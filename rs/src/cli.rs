@@ -92,8 +92,33 @@ pub fn build(config: &Config) -> Result<(), Error> {
 // because the generated binary is dynamically linked to an artifact in the
 // target folder.
 pub fn exec(config: &Config) -> Result<Option<String>, Error> {
+    use std::os::unix::process::ExitStatusExt;
+
     let path = PathBuf::from(&config.output).canonicalize()?;
+
+    // Command::output() returns an error only when spawning the process fails,
+    // not for failed executions. When the child process segfaults, output
+    // returns `Ok(empty stdout, empty stdin)` instead. Explicitly check for
+    // status and construct an error. See
+    // https://github.com/rust-lang/rust/issues/67391
     let exe = Command::new(&path).output()?;
 
-    Ok(Some(String::from_utf8_lossy(&exe.stdout).trim().to_string()))
+    if exe.status.success() {
+        Ok(Some(
+            String::from_utf8_lossy(&exe.stdout).trim().to_string()
+                + String::from_utf8_lossy(&exe.stderr).trim(),
+        ))
+    } else if exe.status.signal() == Some(6) {
+        // SIGABRT is #defined as 6 in /usr/include/asm/signal.h
+        //
+        // Defined as `libc::SIGABRT` already, but no need to pull in a new crate
+        // for just one constant.
+        Err(Error::Runtime(String::from("Child program aborted with SIGABRT")))
+    } else {
+        Err(Error::Runtime(format!(
+            "Child process failed with code: `{:?}` & signal: {:?}",
+            exe.status.code(),
+            exe.status.signal()
+        )))
+    }
 }
