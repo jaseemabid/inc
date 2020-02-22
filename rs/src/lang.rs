@@ -13,8 +13,8 @@ use crate::{
 use std::collections::HashMap;
 
 /// Rename/mangle all references to unique names
-pub fn rename(prog: &[Expr]) -> Vec<Expr> {
-    prog.iter().map(|e| mangle(&HashMap::<String, i64>::new(), e)).collect()
+pub fn rename(prog: Vec<Expr>) -> Vec<Expr> {
+    prog.into_iter().map(|e| mangle(&HashMap::<&str, i64>::new(), e)).collect()
 }
 
 /// Lift all expressions in a program.
@@ -33,69 +33,67 @@ pub fn lift(s: &mut State, prog: &[Expr]) -> Vec<Expr> {
 // the bindings.
 //
 // TODO: Change the type to get an owned copy and avoid all clones in the body
-fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
+fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
     match prog {
-        Identifier(ident) => match env.get(&ident.name) {
-            Some(n) => Identifier(Ident::new(ident.name.clone(), *n)),
-            None => Identifier(ident.clone()),
-        },
+        Identifier(ident) => Identifier(match env.get(ident.name.as_str()) {
+            Some(n) => Ident::new(ident.name, *n),
+            None => ident,
+        }),
 
         Let { bindings, body } => {
             // Collect all the names about to be bound for evaluating body
             let mut all = env.clone();
             for (ident, _index) in bindings.iter() {
-                all.entry(ident.name.clone()).and_modify(|e| *e += 1).or_insert(0);
+                all.entry(ident.name.as_str()).and_modify(|e| *e += 1).or_insert(0);
             }
 
             let bindings = bindings.iter().map(|(current, value)| {
                 // Collect all the names excluding the one being defined now
                 let mut rest = env.clone();
-                for (ident, _) in bindings {
+                for (ident, _) in bindings.iter() {
                     if ident != current {
-                        rest.entry(ident.name.clone()).and_modify(|e| *e += 1).or_insert(0);
+                        rest.entry(ident.name.as_str()).and_modify(|e| *e += 1).or_insert(0);
                     }
                 }
 
                 let value = match value {
-                    Let { .. } => mangle(&all, value),
+                    Let { .. } => mangle(&all, value.clone()),
                     Lambda(c) => {
                         let mut c = c.clone();
                         c.name = Some(current.to_string());
-                        mangle(&all, &Lambda(c))
+                        mangle(&all, Lambda(c))
                     }
-                    _ => mangle(&rest, value),
+                    _ => mangle(&rest, value.clone()),
                 };
 
-                let ident =
-                    Ident { index: *all.get(&current.name).unwrap(), name: current.name.clone() };
+                let ident = Ident {
+                    index: *all.get(current.name.as_str()).unwrap(),
+                    name: current.name.clone(),
+                };
 
                 (ident, value)
             });
 
             Let {
                 bindings: bindings.collect(),
-                body: body.iter().map(|b| mangle(&all, b)).collect(),
+                body: body.into_iter().map(|b| mangle(&all, b)).collect(),
             }
         }
 
-        List(list) => List(list.iter().map(|l| mangle(env, l)).collect()),
+        List(list) => List(list.into_iter().map(|l| mangle(env, l)).collect()),
 
         Cond { pred, then, alt } => Cond {
-            pred: box mangle(env, pred),
-            then: box mangle(env, then),
-            alt: alt.as_ref().map(|u| box mangle(env, u)),
+            pred: box mangle(env, *pred),
+            then: box mangle(env, *then),
+            alt: alt.map(|u| box mangle(env, *u)),
         },
 
-        Lambda(Code { name, tail, formals, free, body }) => Lambda(Code {
-            name: name.clone(),
-            tail: *tail,
-            formals: formals.clone(),
-            free: free.clone(),
-            body: body.iter().map(|b| mangle(env, b)).collect(),
-        }),
+        Lambda(code) => {
+            Lambda(Code { body: code.body.into_iter().map(|b| mangle(env, b)).collect(), ..code })
+        }
 
         // All literals and constants evaluate to itself
-        v => v.clone(),
+        v => v,
     }
 }
 
@@ -217,7 +215,7 @@ mod tests {
         let x = parse1("(let ((x 1)) (let ((x 2)) (+ x x)))");
         let y = parse1("(let ((x.0 1)) (let ((x.1 2)) (+ x.1 x.1)))");
 
-        assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
+        assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
     }
 
     #[test]
@@ -227,7 +225,7 @@ mod tests {
             "(let ((t.0 (cons 1 2))) (let ((t.1 t.0)) (let ((t.2 t.1)) (let ((t.3 t.2)) t.3))))",
         );
 
-        assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
+        assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
     }
 
     #[test]
@@ -248,7 +246,7 @@ mod tests {
                      (cons x.3 x.3)))))",
         );
 
-        assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
+        assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
     }
 
     #[test]
@@ -256,7 +254,7 @@ mod tests {
         let x = parse1("(let ((x 1)) (let ((x x)) (+ x x)))");
         let y = parse1("(let ((x.0 1)) (let ((x.1 x.0)) (+ x.1 x.1)))");
 
-        assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
+        assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
     }
 
     // The mangle tests are so verbose and ugly!
@@ -305,7 +303,7 @@ mod tests {
                (f 12))",
         );
 
-        assert_eq!(x, mangle(&HashMap::<String, i64>::new(), &y));
+        assert_eq!(x, mangle(&HashMap::<&str, i64>::new(), y));
     }
 
     #[test]
@@ -351,7 +349,7 @@ mod tests {
                             (* x (f.0 (dec x))))))) (f.0 5))",
         );
 
-        assert_eq!(x, mangle(&HashMap::<String, i64>::new(), &y))
+        assert_eq!(x, mangle(&HashMap::<&str, i64>::new(), y))
     }
 
     #[test]

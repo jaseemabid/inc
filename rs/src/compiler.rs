@@ -289,7 +289,7 @@ pub mod emit {
         let mut s: State = Default::default();
 
         let prog = lang::lift(&mut s, &prog);
-        let prog = lang::rename(&prog);
+        let prog = lang::rename(prog);
 
         let mut gen = x86::prelude() + x86::func(&x86::init()) + x86::enter() + x86::init_heap();
 
