@@ -463,6 +463,7 @@ impl fmt::Display for Register {
 }
 
 impl fmt::Display for Relative {
+    #[allow(clippy::comparison_chain)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.offset < 0 {
             write!(f, "{}", format!("[{} - {}]", self.register, -self.offset))
