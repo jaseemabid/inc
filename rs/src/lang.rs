@@ -31,6 +31,8 @@ pub fn lift(s: &mut State, prog: &[Expr]) -> Vec<Expr> {
 // including the one being defined only if the subexpresison captures the
 // closure with another let or lambda, otherwise evaluate with only the rest of
 // the bindings.
+//
+// TODO: Change the type to get an owned copy and avoid all clones in the body
 fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
     match prog {
         Identifier(ident) => match env.get(&ident.name) {
@@ -56,7 +58,11 @@ fn mangle(env: &HashMap<String, i64>, prog: &Expr) -> Expr {
 
                 let value = match value {
                     Let { .. } => mangle(&all, value),
-                    Lambda(_) => mangle(&all, value),
+                    Lambda(c) => {
+                        let mut c = c.clone();
+                        c.name = Some(current.to_string());
+                        mangle(&all, &Lambda(c))
+                    }
                     _ => mangle(&rest, value),
                 };
 
@@ -253,13 +259,45 @@ mod tests {
         assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
     }
 
+    // The mangle tests are so verbose and ugly!
     #[test]
     fn letrec() {
-        let x = parse1(
-            "(let ((f (lambda (x) (g x x)))
-                   (g (lambda (x y) (+ x y))))
-               (f 12))",
-        );
+        let x = Let {
+            bindings: vec![
+                (
+                    Ident { name: "f".to_string(), index: 0 },
+                    Lambda(Code {
+                        name: Some(String::from("f.0")),
+                        formals: vec!["x".to_string()],
+                        free: vec![],
+                        body: vec![List(vec![
+                            Identifier(Ident { name: "g".to_string(), index: 0 }),
+                            Identifier(Ident { name: "x".to_string(), index: 0 }),
+                            Identifier(Ident { name: "x".to_string(), index: 0 }),
+                        ])],
+                        tail: false,
+                    }),
+                ),
+                (
+                    Ident { name: "g".to_string(), index: 0 },
+                    Lambda(Code {
+                        name: Some(String::from("g.0")),
+                        formals: vec!["x".to_string(), "y".to_string()],
+                        free: vec![],
+                        body: vec![List(vec![
+                            Identifier(Ident { name: "+".to_string(), index: 0 }),
+                            Identifier(Ident { name: "x".to_string(), index: 0 }),
+                            Identifier(Ident { name: "y".to_string(), index: 0 }),
+                        ])],
+                        tail: false,
+                    }),
+                ),
+            ],
+            body: vec![List(vec![
+                Identifier(Ident { name: "f".to_string(), index: 0 }),
+                Number(12),
+            ])],
+        };
 
         let y = parse1(
             "(let ((f.0 (lambda (x) (g.0 x x)))
@@ -267,17 +305,44 @@ mod tests {
                (f 12))",
         );
 
-        assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
+        assert_eq!(x, mangle(&HashMap::<String, i64>::new(), &y));
     }
 
     #[test]
     fn recursive() {
-        let x = parse1(
-            "(let ((f (lambda (x)
-                        (if (zero? x)
-                          1
-                          (* x (f (dec x))))))) (f 5))",
-        );
+        let x = Let {
+            bindings: vec![(
+                Ident { name: String::from("f"), index: 0 },
+                Lambda(Code {
+                    name: Some(String::from("f.0")),
+                    formals: vec!["x".into()],
+                    free: vec![],
+                    body: vec![Cond {
+                        pred: box List(vec![
+                            Identifier(Ident { name: String::from("zero?"), index: 0 }),
+                            Identifier(Ident { name: String::from("x"), index: 0 }),
+                        ]),
+                        then: box Number(1),
+                        alt: Some(box List(vec![
+                            Identifier(Ident { name: String::from("*"), index: 0 }),
+                            Identifier(Ident { name: String::from("x"), index: 0 }),
+                            List(vec![
+                                Identifier(Ident { name: String::from("f"), index: 0 }),
+                                List(vec![
+                                    Identifier(Ident { name: String::from("dec"), index: 0 }),
+                                    Identifier(Ident { name: String::from("x"), index: 0 }),
+                                ]),
+                            ]),
+                        ])),
+                    }],
+                    tail: false,
+                }),
+            )],
+            body: vec![List(vec![
+                Identifier(Ident { name: String::from("f"), index: 0 }),
+                Number(5),
+            ])],
+        };
 
         let y = parse1(
             "(let ((f.0 (lambda (x)
@@ -286,7 +351,7 @@ mod tests {
                             (* x (f.0 (dec x))))))) (f.0 5))",
         );
 
-        assert_eq!(y, mangle(&HashMap::<String, i64>::new(), &x));
+        assert_eq!(x, mangle(&HashMap::<String, i64>::new(), &y))
     }
 
     #[test]
