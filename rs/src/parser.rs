@@ -30,12 +30,12 @@ use std::str;
 /// <form>     → <definition> | <expression>
 /// ```
 fn program(i: &str) -> IResult<&str, Vec<Expr>> {
-    many1(delimited(space0, expression, space0))(i)
+    many1(delimited(space0, form, space0))(i)
 }
 
-// pub fn form(i: &str) -> IResult<&str, Expr> {
-//     alt((definition, expression))(i)
-// }
+fn form(i: &str) -> IResult<&str, Expr> {
+    alt((definition, expression))(i)
+}
 
 /// Definitions include various forms of declarations
 ///
@@ -65,26 +65,23 @@ fn program(i: &str) -> IResult<&str, Vec<Expr>> {
 /// <keyword>           → <identifier>
 /// <syntax binding>    → (<keyword> <transformer expression>)
 /// ```
-// fn definition(i: &str) -> IResult<&str, Expr> {
-//     alt((let_syntax, if_syntax))(i)
-// }
+fn definition(i: &str) -> IResult<&str, Expr> {
+    define_syntax(i) // | begin_syntax
+}
 
-/// `(let-syntax (<syntax binding>*) <expression>+)`
-fn let_syntax(i: &str) -> IResult<&str, Expr> {
-    let (i, _) = tuple((open, tag("let"), space1))(i)?;
-    let (i, bindings) = delimited(open, many0(binding), close)(i)?;
+/// ✗ (define <variable> <expression>) |
+/// ✓ (define (<variable> <variable>*) <body>) |
+/// ✗ (define (<variable> <variable>* . <variable>) <body>)
+fn define_syntax(i: &str) -> IResult<&str, Expr> {
+    let (i, _) = tuple((open, tag("define"), space1))(i)?;
+    let (i, mut params) = delimited(open, identifiers, close)(i)?;
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
-    Ok((i, Expr::Let { bindings, body }))
-}
+    let name = Some(params[0].clone());
+    let formals = params.split_off(1);
 
-/// `named → (name value)`
-fn binding(i: &str) -> IResult<&str, (Ident, Expr)> {
-    let (i, (_, name, _, value, _, _)) =
-        tuple((open, identifier, space1, expression, close, space0))(i)?;
-
-    Ok((i, (Ident::from(name), value)))
+    Ok((i, Expr::Lambda(Code { name, tail: false, formals, body, free: vec![] })))
 }
 
 /// Core expressions
@@ -116,6 +113,24 @@ fn binding(i: &str) -> IResult<&str, (Ident, Expr)> {
 /// ```
 fn expression(i: &str) -> IResult<&str, Expr> {
     alt((constant, variable, quote, lambda_syntax, if_syntax, let_syntax, application))(i)
+}
+
+/// `(let-syntax (<syntax binding>*) <expression>+)`
+fn let_syntax(i: &str) -> IResult<&str, Expr> {
+    let (i, _) = tuple((open, tag("let"), space1))(i)?;
+    let (i, bindings) = delimited(open, many0(binding), close)(i)?;
+    let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
+    let (i, _) = close(i)?;
+
+    Ok((i, Expr::Let { bindings, body }))
+}
+
+/// `named → (name value)`
+fn binding(i: &str) -> IResult<&str, (Ident, Expr)> {
+    let (i, (_, name, _, value, _, _)) =
+        tuple((open, identifier, space1, expression, close, space0))(i)?;
+
+    Ok((i, (Ident::from(name), value)))
 }
 
 /// `(lambda <formals> <body>)`
@@ -221,6 +236,10 @@ fn identifier(i: &str) -> IResult<&str, String> {
             format!("{}{}", i, s.iter().collect::<String>())
         }),
     ))(i)
+}
+
+fn identifiers(i: &str) -> IResult<&str, Vec<String>> {
+    many1(terminated(identifier, space0))(i)
 }
 
 fn initial(i: &str) -> IResult<&str, char> {
@@ -534,6 +553,49 @@ mod tests {
     }
 
     #[test]
+    fn define_syntax() -> Result<(), nom::Err<(&'static str, nom::error::ErrorKind)>> {
+        let prog = "(define (id x) x)";
+        let exp = Lambda(Code {
+            name: Some("id".into()),
+            tail: false,
+            formals: vec!["x".into()],
+            body: vec![("x".into())],
+            free: vec![],
+        });
+
+        let (rest, x) = super::define_syntax(prog)?;
+        assert_eq!(rest, "");
+        assert_eq!(exp, x);
+        assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(define (pi) 42)";
+        let exp = Lambda(Code {
+            name: Some("pi".into()),
+            tail: false,
+            formals: vec![],
+            body: vec![42.into()],
+            free: vec![],
+        });
+
+        let (rest, x) = super::define_syntax(prog)?;
+        assert_eq!(rest, "");
+        assert_eq!(exp, x);
+        assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(define (add a b) (+ a b))";
+        let exp = Lambda(Code {
+            name: Some("add".into()),
+            tail: false,
+            formals: vec!["a".into(), "b".into()],
+            body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],
+            free: vec![],
+        });
+        assert_eq!(ok(vec![exp]), program(prog));
+
+        Ok(())
+    }
+
+    #[test]
     fn lambda_syntax() {
         let prog = "(lambda () 1)";
         let exp = Lambda(Code {
@@ -615,7 +677,7 @@ mod tests {
 /// Parse a single expression for testing, return or panic
 #[cfg(test)]
 pub fn parse1<'a>(i: &'a str) -> Expr {
-    match expression(i) {
+    match form(i) {
         Ok((_rest, e)) => e,
         Err(e) => panic!("Failed to parse `{}`: {:?}", i, e),
     }
