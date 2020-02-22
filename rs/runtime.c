@@ -14,6 +14,7 @@ extern int64_t init(int64_t*) __attribute__((noinline));
 // overflow isn't that simple. See the rethinkdb blog for details.
 //
 // https://rethinkdb.com/blog/handling-stack-overflow-on-custom-stacks/
+#ifdef __linux__
 void set_handler(void (*handler)(int, siginfo_t *, void *)) {
     struct sigaction action;
     action.sa_flags = SA_SIGINFO|SA_STACK;
@@ -50,12 +51,16 @@ void handler(int signo, siginfo_t *info, __attribute__((unused)) void *extra) {
     printf("SIGSEGV at address   : 0x%lx \n", (long)info->si_addr);
     abort();
 }
+#endif
 
 int main() {
     FILE *debug = getenv("DEBUG") ? stderr : fopen("/dev/null", "w");
     fprintf(debug, "%s\n\n", "The glorious incremental compiler");
 
+
+    #ifdef __linux__
     set_handler(handler);
+    #endif
 
     int64_t r12, rsp;
     int64_t *heap = calloc(1024, 8);
