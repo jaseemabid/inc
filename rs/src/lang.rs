@@ -40,14 +40,36 @@ fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
             None => ident,
         }),
 
-        Let { bindings, body } => {
-            // Collect all the names about to be bound for evaluating body
-            let mut all = env.clone();
-            for (ident, _index) in bindings.iter() {
-                all.entry(ident.name.as_str()).and_modify(|e| *e += 1).or_insert(0);
-            }
+        Let { bindings, body } => mangle1(env, bindings, body),
 
-            let bindings = bindings.iter().map(|(current, value)| {
+        List(list) => List(list.into_iter().map(|l| mangle(env, l)).collect()),
+
+        Cond { pred, then, alt } => Cond {
+            pred: box mangle(env, *pred),
+            then: box mangle(env, *then),
+            alt: alt.map(|u| box mangle(env, *u)),
+        },
+
+        Lambda(code) => {
+            Lambda(Code { body: code.body.into_iter().map(|b| mangle(env, b)).collect(), ..code })
+        }
+
+        // All literals and constants evaluate to itself
+        v => v,
+    }
+}
+
+fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Expr>) -> Expr {
+    // Collect all the names about to be bound for evaluating body
+    let mut all = env.clone();
+    for (ident, _index) in bindings.iter() {
+        all.entry(ident.name.as_str()).and_modify(|e| *e += 1).or_insert(0);
+    }
+
+    Let {
+        bindings: bindings
+            .iter()
+            .map(|(current, value)| {
                 // Collect all the names excluding the one being defined now
                 let mut rest = env.clone();
                 for (ident, _) in bindings.iter() {
@@ -72,28 +94,10 @@ fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
                 };
 
                 (ident, value)
-            });
+            })
+            .collect(),
 
-            Let {
-                bindings: bindings.collect(),
-                body: body.into_iter().map(|b| mangle(&all, b)).collect(),
-            }
-        }
-
-        List(list) => List(list.into_iter().map(|l| mangle(env, l)).collect()),
-
-        Cond { pred, then, alt } => Cond {
-            pred: box mangle(env, *pred),
-            then: box mangle(env, *then),
-            alt: alt.map(|u| box mangle(env, *u)),
-        },
-
-        Lambda(code) => {
-            Lambda(Code { body: code.body.into_iter().map(|b| mangle(env, b)).collect(), ..code })
-        }
-
-        // All literals and constants evaluate to itself
-        v => v,
+        body: body.into_iter().map(|b| mangle(&all, b)).collect(),
     }
 }
 
