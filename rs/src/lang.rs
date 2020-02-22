@@ -143,8 +143,14 @@ fn lift1(s: &mut State, prog: &Expr) -> Expr {
             alt: alt.as_deref().map({ |e| box lift1(s, &e) }),
         },
 
-        // A literal lambda must be in an inline calling position
-        Lambda(Code { .. }) => unimplemented!("inline λ"),
+        // Am unnamed literal lambda must be in an inline calling position
+        Lambda(Code { name: None, .. }) => unimplemented!("inline λ"),
+
+        // Lift named code blocks to top level immediately, since names are manged by now.
+        Lambda(code @ Code { name: Some(n), .. }) => {
+            s.functions.insert(n.to_string(), code.clone());
+            Expr::Nil
+        }
 
         e => e.clone(),
     }

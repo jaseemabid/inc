@@ -503,6 +503,15 @@ mod functions {
     fn closure() {
         test1("(let ((x 42)) (let ((f (lambda () x))) (f)))", "12")
     }
+
+    #[test]
+    fn defined() {
+        test1(
+            "(define (id x) x)
+             (id 42)",
+            "42",
+        );
+    }
 }
 
 // Step 9, TCO
