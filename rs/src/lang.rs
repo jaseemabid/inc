@@ -14,6 +14,8 @@ use std::collections::HashMap;
 
 /// Rename/mangle all references to unique names
 pub fn rename(prog: Vec<Expr>) -> Vec<Expr> {
+    // TODO: This isn't right, same state should be used for all sub expressions.
+    // Test for 2 different functions with the same name.
     prog.into_iter().map(|e| mangle(&HashMap::<&str, i64>::new(), e)).collect()
 }
 
@@ -31,8 +33,6 @@ pub fn lift(s: &mut State, prog: &[Expr]) -> Vec<Expr> {
 // including the one being defined only if the subexpresison captures the
 // closure with another let or lambda, otherwise evaluate with only the rest of
 // the bindings.
-//
-// TODO: Change the type to get an owned copy and avoid all clones in the body
 fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
     match prog {
         Identifier(ident) => Identifier(match env.get(ident.name.as_str()) {
@@ -101,6 +101,12 @@ fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Exp
     }
 }
 
+
+// Function names are guaranteed to be unique after mangling, so its safe to
+// lift *ALL* lambdas to top level.
+//
+// NOTE: ☝ this isn't currently right, because mangle doesn't cover all edge
+// cases, but lift should be able to assume so.
 fn lift1(s: &mut State, prog: &Expr) -> Expr {
     match prog {
         Str(reference) => {
