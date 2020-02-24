@@ -81,8 +81,12 @@ pub struct Code {
 /// Pretty print an Expr
 impl fmt::Display for Ident {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Ident { name, index, .. } = self;
-        write!(f, "{}.{}", name, index)
+        let Ident { name, index } = self;
+        if *index == 0 {
+            write!(f, "{}", name)
+        } else {
+            write!(f, "{}.{}", name, index)
+        }
     }
 }
 
