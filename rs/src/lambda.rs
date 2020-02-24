@@ -39,9 +39,8 @@ pub fn emit(s: &mut State, exprs: &[Expr]) -> ASM {
     let mut asm = ASM(vec![]);
 
     for expr in exprs.iter() {
-        match expr {
-            Expr::Lambda(c) => asm += emit1(s, c),
-            _ => {}
+        if let Expr::Lambda(c) = expr {
+            asm += emit1(s, c)
         }
     }
     asm
