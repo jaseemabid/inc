@@ -78,7 +78,7 @@ fn define_syntax(i: &str) -> IResult<&str, Expr> {
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
-    let name = Some(params[0].clone());
+    let name = Some(Ident::from(params[0].clone()));
     let formals = params.split_off(1);
 
     Ok((i, Expr::Lambda(Code { name, tail: false, formals, body, free: vec![] })))
@@ -418,6 +418,9 @@ mod tests {
 
         // Quoted symbols are not identifiers
         assert_eq!(partial("'woo", String::from("a")), identifier("a'woo"));
+
+        // Internal hack, allow shadowing with .
+        assert_eq!(ok(Identifier(Ident { name: String::from("foo"), index: 4 })), datum("foo.4"));
     }
 
     // #[test]
@@ -556,7 +559,7 @@ mod tests {
     fn define_syntax() -> Result<(), nom::Err<(&'static str, nom::error::ErrorKind)>> {
         let prog = "(define (id x) x)";
         let exp = Lambda(Code {
-            name: Some("id".into()),
+            name: Some(Ident::new("id")),
             tail: false,
             formals: vec!["x".into()],
             body: vec![("x".into())],
@@ -570,7 +573,7 @@ mod tests {
 
         let prog = "(define (pi) 42)";
         let exp = Lambda(Code {
-            name: Some("pi".into()),
+            name: Some(Ident::new("pi")),
             tail: false,
             formals: vec![],
             body: vec![42.into()],
@@ -584,7 +587,7 @@ mod tests {
 
         let prog = "(define (add a b) (+ a b))";
         let exp = Lambda(Code {
-            name: Some("add".into()),
+            name: Some(Ident::new("add")),
             tail: false,
             formals: vec!["a".into(), "b".into()],
             body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],

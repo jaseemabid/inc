@@ -2,9 +2,9 @@
 
 /// State for the code generator
 pub mod state {
-    use crate::core::{Code, Ident};
+    use crate::core::Ident;
     use crate::x86::{Reference, ASM, WORDSIZE};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     /// State for the code generator; easier to bundle it all into a struct than
     /// pass several arguments in.
@@ -27,7 +27,7 @@ pub mod state {
         li: u64,
         pub strings: HashMap<String, usize>,
         pub symbols: HashMap<String, usize>,
-        pub functions: HashMap<String, Code>,
+        pub functions: HashSet<Ident>,
         env: Env,
     }
 
@@ -39,7 +39,7 @@ pub mod state {
                 li: 0,
                 strings: HashMap::new(),
                 symbols: HashMap::new(),
-                functions: HashMap::new(),
+                functions: HashSet::new(),
                 env: Default::default(),
             }
         }
@@ -263,9 +263,9 @@ pub mod emit {
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
-                [Identifier(Ident { name, .. }), args @ ..] => {
-                    if s.functions.contains_key(name) {
-                        lambda::call(s, name, &args)
+                [Identifier(i @ Ident { name, .. }), args @ ..] => {
+                    if s.functions.contains(&i) {
+                        lambda::call(s, &i, &args)
                     } else if let Some(x) = primitives::call(s, &name, args) {
                         x
                     } else if rt::defined(name) {
@@ -277,6 +277,8 @@ pub mod emit {
                 _ => panic!("Unknown expression: `{}`", prog),
             },
 
+            Lambda(_) =>  ASM(vec![]),
+
             _ => match immediate::to(&prog) {
                 Some(c) => x86::mov(RAX.into(), c.into()).into(),
                 None => panic!("Unknown expression: `{}`", prog),
@@ -285,11 +287,11 @@ pub mod emit {
     }
 
     /// Top level interface to the emit module
-    pub fn program(prog: &[Expr]) -> String {
+    pub fn program(prog: Vec<Expr>) -> String {
         let mut s: State = Default::default();
 
-        let prog = lang::lift(&mut s, &prog);
         let prog = lang::rename(prog);
+        let prog = lang::lift(&mut s, prog);
 
         let mut gen = x86::prelude() + x86::func(&x86::init()) + x86::enter() + x86::init_heap();
 
@@ -300,7 +302,7 @@ pub mod emit {
         gen += x86::leave();
         gen += strings::inline(&s);
         gen += symbols::inline(&s);
-        gen += lambda::code(&mut s);
+        gen += lambda::emit(&mut s, &prog);
 
         gen.to_string()
     }

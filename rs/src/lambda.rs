@@ -34,60 +34,71 @@ use crate::{
     x86::{self, Reference, Register::*, Relative, ASM, WORDSIZE},
 };
 
-/// Function body for the simplest C style functions
-///
-/// A lot of required sanity and safety checks are missing.
-///
-/// The calling convention expected by the function is kind of odd and needs
-/// to be standardized. Arguments are pushed to stack in order (unlike
-/// cdecl, which pushes in reverse order). System V AMD64 ABI would be
-/// perfect since all args are passed in registers and is a lot cleaner and
-/// is already used for `init()`
-///
-/// The caller of the function emits arguments at `RSP - 24`, then `RSP -
-/// 32` etc. The function preamble effectively decrements the base pointer
-/// by `0x10` such that the such that the first argument can be accessed at
-/// `RBP - 8`, the next one at `RBP - 16` etc.
-pub fn code(s: &mut State) -> ASM {
+/// Emit machine code for all top level functions
+pub fn emit(s: &mut State, exprs: &[Expr]) -> ASM {
     let mut asm = ASM(vec![]);
 
-    // This clone is tricky and I don't understand it well enough. Iterating
-    // over `s.functions` takes ownership of `s` and borrow checker wont let us
-    // have a mutable `s` inside the body. An explicit clone here is a hack to
-    // get around it.
-    let codes = &(s.functions).clone();
-
-    for (name, Code { formals, body, .. }) in codes.iter() {
-        asm += x86::func(&name);
-
-        // Start a new lexical environment for the function, add the
-        // formal arguments and leave when it is evaluated. The first
-        // argument is available at `RBP - 8`, next at `RBP - 16` etc.
-        //
-        // TODO: `alloc()` and `dealloc()` doesn't understand `enter()` and
-        // `leave()`, so there is a fair bit of duplication here.
-        s.enter();
-
-        for (i, arg) in formals.iter().enumerate() {
-            s.set(
-                Ident::new(arg, 0),
-                Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into(),
-            );
+    for expr in exprs.iter() {
+        match expr {
+            Expr::Lambda(c) => asm += emit1(s, c),
+            _ => {}
         }
-
-        for b in body {
-            asm += x86::enter();
-            asm += eval(s, b);
-            asm += x86::leave()
-        }
-
-        s.leave()
     }
     asm
 }
 
+/// Emit unction body for the simplest C style functions
+///
+/// ⚠ A lot of required sanity and safety checks are missing.
+///
+/// The calling convention expected by the function is kind of odd and needs to
+/// be standardized. Arguments are pushed to stack in order (unlike cdecl, which
+/// pushes in reverse order). System V AMD64 ABI would be perfect since all args
+/// are passed in registers and is a lot cleaner and is already used for
+/// `init()`
+///
+/// The caller of the function emits arguments at `RSP - 24`, then `RSP - 32`
+/// etc. The function preamble effectively decrements the base pointer by `0x10`
+/// such that the such that the first argument can be accessed at `RBP - 8`, the
+/// next one at `RBP - 16` etc.
+fn emit1(s: &mut State, code: &Code) -> ASM {
+    let mut asm = ASM(vec![]);
+
+    let name = match &code.name {
+        None => panic!("Generating code for unnamed function, something went wrong in mangling"),
+        Some(name) => name,
+    };
+
+    asm += x86::func(&name.to_string());
+
+    // Start a new lexical environment for the function, add the formal
+    // arguments and leave when it is evaluated. The first argument is available
+    // at `RBP - 8`, next at `RBP - 16` etc.
+    //
+    // TODO: `alloc()` and `dealloc()` doesn't understand `enter()` and
+    // `leave()`, so there is a fair bit of duplication here.
+    s.enter();
+
+    for (i, arg) in code.formals.iter().enumerate() {
+        s.set(
+            Ident::new(arg),
+            Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into(),
+        );
+    }
+
+    for b in &code.body {
+        asm += x86::enter();
+        asm += eval(s, &b);
+        asm += x86::leave()
+    }
+
+    s.leave();
+
+    asm
+}
+
 /// Emit code for a function application. See `code` for details.
-pub fn call(s: &mut State, name: &str, args: &[Expr]) -> ASM {
+pub fn call(s: &mut State, name: &Ident, args: &[Expr]) -> ASM {
     // Evaluate and push the arguments into stack; 2 words below SI. See
     // `code` docs for a detailed description of how this works.
     //
@@ -134,10 +145,10 @@ pub fn call(s: &mut State, name: &str, args: &[Expr]) -> ASM {
     let locals = -(s.si + WORDSIZE);
     if locals != 0 {
         asm += x86::sub(RSP.into(), Reference::Const(locals));
-        asm += x86::call(name);
+        asm += x86::call(&name.to_string());
         asm += x86::add(RSP.into(), Reference::Const(locals));
     } else {
-        asm += x86::call(name)
+        asm += x86::call(&name.to_string())
     }
 
     // NOTE: This is one of those big aha moments.

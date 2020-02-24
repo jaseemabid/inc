@@ -44,8 +44,12 @@ pub struct Ident {
 }
 
 impl Ident {
-    pub fn new<S: Into<String>>(name: S, index: i64) -> Self {
-        Self { name: name.into(), index }
+    pub fn new<S: Into<String>>(name: S) -> Self {
+        Self { name: name.into(), index: 0 }
+    }
+
+    pub fn inc(self: &Self) -> Self {
+        Self { name: self.name.clone(), index: self.index + 1 }
     }
 
     pub fn from<S: Into<String>>(name: S) -> Self {
@@ -60,10 +64,10 @@ impl Ident {
 }
 
 /// Code is a refinement type for Expression specialized for lambdas
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Code {
     // A rose by any other name would smell as sweet
-    pub name: Option<String>,
+    pub name: Option<Ident>,
     // Formal arguments to the function, filled in by the parser
     pub formals: Vec<String>,
     // Free variables, added post closure conversion

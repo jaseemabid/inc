@@ -27,19 +27,19 @@ pub fn run(config: &Config, action: Action) -> Result<Option<String>, Error> {
             Ok(None)
         }
         Action::GenASM => {
-            gen(config, &prog)?;
+            gen(config, prog)?;
 
             Ok(None)
         }
         Action::Run => {
-            gen(config, &prog)?;
+            gen(config, prog)?;
             build(&config)?;
             exec(&config)
         }
     }
 }
 
-pub fn gen<'a>(config: &'a Config, prog: &[Expr]) -> Result<(), Error<'a>> {
+pub fn gen<'a>(config: &'a Config, prog: Vec<Expr>) -> Result<(), Error<'a>> {
     let mut handler = File::create(&config.asm()).or_else(|e| {
         Err(Error::Internal { message: format!("Failed to create {}", &config.asm()), e: Some(e) })
     })?;
