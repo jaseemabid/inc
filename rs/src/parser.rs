@@ -155,7 +155,7 @@ fn if_syntax(i: &str) -> IResult<&str, Expr> {
         close,
     ))(i)?;
 
-    Ok((i, Expr::Cond { pred: box pred, then: box then, alt: alt.map({ |(_, a)| box a }) }))
+    Ok((i, Expr::Cond { pred: box pred, then: box then, alt: alt.map(|(_, a)| box a) }))
 }
 
 /// variable is an identifier
@@ -183,13 +183,13 @@ fn body(i: &str) -> IResult<&str, Vec<Expr>> {
 /// (quote <datum>) | '<datum>
 // Note: This parser only handles simple quoted symbols for now
 fn quote(i: &str) -> IResult<&str, Expr> {
-    map(tuple((tag("\'"), identifier)), { |(_, i)| Expr::Symbol(i) })(i)
+    map(tuple((tag("\'"), identifier)), |(_, i)| Expr::Symbol(i))(i)
 }
 
 /// `<constant> → <boolean> | <number> | <character> | <string>`
 fn constant(i: &str) -> IResult<&str, Expr> {
     alt((
-        (map(tag("()"), { |_| Expr::Nil })),
+        (map(tag("()"), |_| Expr::Nil)),
         (map(ascii, Expr::Char)),
         (map(boolean, Expr::Boolean)),
         (map(number, Expr::Number)),
@@ -287,7 +287,7 @@ fn digit(i: &str) -> IResult<&str, char> {
 #[cfg(test)]
 fn datum(i: &str) -> IResult<&str, Expr> {
     alt((
-        (map(tag("()"), { |_| Expr::Nil })),
+        (map(tag("()"), |_| Expr::Nil)),
         (map(boolean, Expr::Boolean)),
         (map(ascii, Expr::Char)),
         (map(number, Expr::Number)),
@@ -324,7 +324,7 @@ fn ascii(i: &str) -> IResult<&str, u8> {
         value(13 as u8, tag(r"#\return")),
         value(32 as u8, tag(r"#\space")),
         // Picking the first byte is quite unsafe, fix for UTF8
-        preceded(tag(r"#\"), map(anychar, { |c: char| c as u8 })),
+        preceded(tag(r"#\"), map(anychar, |c: char| c as u8)),
     ))(i)
 }
 

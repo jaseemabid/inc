@@ -29,7 +29,7 @@ pub fn rename(prog: Vec<Expr>) -> Vec<Expr> {
 // compiler. Actions are specific to the types - strings and symbols are added
 // to a lookup table and lambda definitions are raised to top level.
 pub fn lift(s: &mut State, prog: Vec<Expr>) -> Vec<Expr> {
-    prog.into_iter().flat_map({ |expr| lift1(s, expr) }).collect()
+    prog.into_iter().flat_map(|expr| lift1(s, expr)).collect()
 }
 
 /// Rename/mangle all references to unique names
@@ -151,18 +151,18 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
 
             export.push(Let {
                 bindings: rest,
-                body: body.into_iter().map({ |b| shrink(lift1(s, b)) }).collect(),
+                body: body.into_iter().map(|b| shrink(lift1(s, b))).collect(),
             });
 
             export
         }
 
-        List(list) => vec![List(list.into_iter().map({ |l| shrink(lift1(s, l)) }).collect())],
+        List(list) => vec![List(list.into_iter().map(|l| shrink(lift1(s, l))).collect())],
 
         Cond { pred, then, alt } => vec![Cond {
             pred: box shrink(lift1(s, *pred)),
             then: box shrink(lift1(s, *then)),
-            alt: alt.map({ |e| box shrink(lift1(s, *e)) }),
+            alt: alt.map(|e| box shrink(lift1(s, *e))),
         }],
 
         // Lift named code blocks to top level immediately, since names are manged by now.
