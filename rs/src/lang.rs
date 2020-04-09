@@ -168,7 +168,8 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
         // Lift named code blocks to top level immediately, since names are manged by now.
         Lambda(code @ Code { name: Some(_), .. }) => {
             s.functions.insert(code.name.as_ref().unwrap().clone());
-            vec![Lambda(code)]
+            let body = code.body.into_iter().map(|b| lift1(s, b)).flatten().collect();
+            vec![Lambda(Code { body, ..code })]
         }
 
         // Am unnamed literal lambda must be in an inline calling position
