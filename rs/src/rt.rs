@@ -1,15 +1,11 @@
 //! Scheme runtime for Incremental
 //!
-//! Low level runtime functions for memory management, object layout, low level
-//! bit fiddling etc.
+//! Runtime implements primitives for memory management, IO etc and all other
+//! low level nuances. Functions defined here are available at runtime to be
+//! called from scheme functions.
 
 use crate::{immediate::*, x86::WORDSIZE};
-use std::{
-    ffi::CStr,
-    fs::{self, File},
-    io::{self, Write},
-    os::{raw::c_char, unix::io::AsRawFd},
-};
+use std::{ffi::CStr, io::Write, os::raw::c_char};
 
 /// Checks if a function is defined in the built in runtime
 pub fn defined(name: &str) -> bool {
@@ -78,12 +74,12 @@ pub extern "C" fn print(val: i64, nested: bool) {
 
             print!("]");
 
-            io::stdout().flush().unwrap();
+            std::io::stdout().flush().unwrap();
         }
         _ => panic!("Unexpected value returned by runtime: {}", val),
     }
 
-    io::stdout().flush().unwrap();
+    std::io::stdout().flush().unwrap();
 }
 
 #[no_mangle]
@@ -117,22 +113,6 @@ pub extern "C" fn symbol_eq(a: i64, b: i64) -> i64 {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn rt_open_write(fname: i64) -> i64 {
-    let f = File::create(str_str(fname)).unwrap().as_raw_fd();
-    i64::from(f << SHIFT)
-}
-
-#[no_mangle]
-pub extern "C" fn writeln(data: i64, port: i64) -> i64 {
-    let path = str_str(vec_nth(port, 1));
-    let s = format!("{}\n", str_str(data));
-
-    fs::write(&path, s).unwrap_or_else(|_| panic!("Failed to write to {}", &path));
-
-    NIL
-}
-
 // Get a string pointer from a string object
 fn str_str(val: i64) -> String {
     assert!((val & MASK) == STR);
@@ -158,4 +138,31 @@ fn vec_nth(val: i64, n: i64) -> i64 {
     assert!((val & MASK) == VEC);
 
     unsafe { *((val - VEC + WORDSIZE + (n * WORDSIZE)) as *const i64) }
+}
+
+/// IO Primitives for Inc
+pub mod io {
+    use super::*;
+    use std::{
+        fs::{self, File},
+        os::unix::io::AsRawFd,
+    };
+
+    /// Open a file and return immediate encoded file descriptor
+    #[no_mangle]
+    pub extern "C" fn rt_open_write(fname: i64) -> i64 {
+        let f = File::create(str_str(fname)).unwrap().as_raw_fd();
+        i64::from(f << SHIFT)
+    }
+
+    /// Write a new line terminated string to a port object
+    #[no_mangle]
+    pub extern "C" fn writeln(data: i64, port: i64) -> i64 {
+        let path = str_str(vec_nth(port, 1));
+        let s = format!("{}\n", str_str(data));
+
+        fs::write(&path, s).unwrap_or_else(|_| panic!("Failed to write to {}", &path));
+
+        NIL
+    }
 }
