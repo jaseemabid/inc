@@ -538,6 +538,18 @@ mod io {
     use std::fs::read_to_string;
 
     #[test]
+    fn stdin() {
+        let k = r#"
+            (define (current-input-port)
+              (let ((fd (rt-current-input-port)))
+                (vector 'port "stdin" fd)))
+
+            (current-input-port)"#;
+
+        test1(k, r#"['port "stdin" 0]"#);
+    }
+
+    #[test]
     fn fd() {
         let k = r#"
             (let ((open-output-file (lambda (fname)

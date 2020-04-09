@@ -13,8 +13,17 @@ pub fn defined(name: &str) -> bool {
 }
 
 // All symbols exported to the runtime from this module
-const SYMBOLS: [&str; 6] =
-    ["string-length", "symbol=?", "exit", "rt-open-write", "writeln", "type"];
+const SYMBOLS: [&str; 9] = [
+    "string-length",
+    "symbol=?",
+    "exit",
+    "rt-open-write",
+    "rt-current-input-port",
+    "rt-current-output-port",
+    "rt-current-error-port",
+    "writeln",
+    "type",
+];
 
 #[no_mangle]
 pub extern "C" fn print(val: i64, nested: bool) {
@@ -61,6 +70,8 @@ pub extern "C" fn print(val: i64, nested: bool) {
         STR => print!("\"{}\"", str_str(val)),
         SYM => print!("'{}", sym_name(val)),
 
+        // TODO: Pretty print ports differently from other vectors
+        // Example: #<input/output port stdin/out> | #<output port /tmp/foo.txt>
         VEC => {
             print!("[");
 
@@ -164,5 +175,22 @@ pub mod io {
         fs::write(&path, s).unwrap_or_else(|_| panic!("Failed to write to {}", &path));
 
         NIL
+    }
+
+    // Standard ports can be overridden in Scheme, but these constants would do
+    // for now
+    #[no_mangle]
+    pub extern "C" fn rt_current_input_port() -> i64 {
+        i64::from(0 << SHIFT)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rt_current_output_port() -> i64 {
+        i64::from(1 << SHIFT)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rt_current_error_port() -> i64 {
+        i64::from(2 << SHIFT)
     }
 }

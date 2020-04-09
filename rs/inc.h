@@ -35,10 +35,22 @@ int64_t cdr(int64_t val);
 
 void print(int64_t val, bool nested);
 
+int64_t rt_current_error_port(void);
+
+int64_t rt_current_input_port(void);
+
+int64_t rt_current_output_port(void);
+
+/**
+ * Open a file and return immediate encoded file descriptor
+ */
 int64_t rt_open_write(int64_t fname);
 
 uintptr_t string_length(int64_t val);
 
 int64_t symbol_eq(int64_t a, int64_t b);
 
+/**
+ * Write a new line terminated string to a port object
+ */
 int64_t writeln(int64_t data, int64_t port);
