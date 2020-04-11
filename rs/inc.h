@@ -42,15 +42,27 @@ int64_t rt_current_input_port(void);
 int64_t rt_current_output_port(void);
 
 /**
- * Open a file and return immediate encoded file descriptor
+ * Open a file for reading return the immediate encoded file descriptor
+ * Fails if file doesn't exist already
+ */
+int64_t rt_open_read(int64_t fname);
+
+/**
+ * Open a file for writing and return the immediate encoded file descriptor
+ * Creates file if it doesn't exist already
  */
 int64_t rt_open_write(int64_t fname);
+
+/**
+ * Read string from a port object
+ */
+int64_t rt_read(int64_t port);
+
+/**
+ * Write a string object to a port
+ */
+int64_t rt_write(int64_t data, int64_t port);
 
 uintptr_t string_length(int64_t val);
 
 int64_t symbol_eq(int64_t a, int64_t b);
-
-/**
- * Write a new line terminated string to a port object
- */
-int64_t writeln(int64_t data, int64_t port);

@@ -13,15 +13,17 @@ pub fn defined(name: &str) -> bool {
 }
 
 // All symbols exported to the runtime from this module
-const SYMBOLS: [&str; 9] = [
-    "string-length",
-    "symbol=?",
+const SYMBOLS: [&str; 11] = [
     "exit",
-    "rt-open-write",
+    "rt-current-error-port",
     "rt-current-input-port",
     "rt-current-output-port",
-    "rt-current-error-port",
-    "writeln",
+    "rt-open-write",
+    "rt-open-read",
+    "rt-read",
+    "rt-write",
+    "string-length",
+    "symbol=?",
     "type",
 ];
 
@@ -159,24 +161,6 @@ pub mod io {
         os::unix::io::AsRawFd,
     };
 
-    /// Open a file and return immediate encoded file descriptor
-    #[no_mangle]
-    pub extern "C" fn rt_open_write(fname: i64) -> i64 {
-        let f = File::create(str_str(fname)).unwrap().as_raw_fd();
-        i64::from(f << SHIFT)
-    }
-
-    /// Write a new line terminated string to a port object
-    #[no_mangle]
-    pub extern "C" fn writeln(data: i64, port: i64) -> i64 {
-        let path = str_str(vec_nth(port, 1));
-        let s = format!("{}\n", str_str(data));
-
-        fs::write(&path, s).unwrap_or_else(|_| panic!("Failed to write to {}", &path));
-
-        NIL
-    }
-
     // Standard ports can be overridden in Scheme, but these constants would do
     // for now
     #[no_mangle]
@@ -192,5 +176,71 @@ pub mod io {
     #[no_mangle]
     pub extern "C" fn rt_current_error_port() -> i64 {
         i64::from(2 << SHIFT)
+    }
+
+    /// Open a file for writing and return the immediate encoded file descriptor
+    /// Creates file if it doesn't exist already
+    #[no_mangle]
+    pub extern "C" fn rt_open_write(fname: i64) -> i64 {
+        let f = File::create(str_str(fname)).unwrap().as_raw_fd();
+        i64::from(f << SHIFT)
+    }
+
+    /// Open a file for reading return the immediate encoded file descriptor
+    /// Fails if file doesn't exist already
+    #[no_mangle]
+    pub extern "C" fn rt_open_read(fname: i64) -> i64 {
+        let f = File::open(str_str(fname)).unwrap().as_raw_fd();
+        i64::from(f << SHIFT)
+    }
+
+    /// Write a string object to a port
+    #[no_mangle]
+    pub extern "C" fn rt_write(data: i64, port: i64) -> i64 {
+        let path = str_str(vec_nth(port, 1));
+        fs::write(&path, str_str(data)).unwrap_or_else(|_| panic!("Failed to write to {}", &path));
+
+        NIL
+    }
+
+    /// Read string from a port object
+    //
+    // ⚠️ This is so far away from the spec and should be called something else.
+    //
+    // This is honestly making me wonder WTH I'm really doing. There is no need
+    // to really do this in assembly, what I need is a custom allocator in Rust.
+    // See `strings::make` as well.
+    //
+    // This is legit cursed!
+    #[no_mangle]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    pub extern "C" fn rt_read(port: i64) -> i64 {
+        let path = str_str(vec_nth(port, 1));
+        let data = fs::read(&path).unwrap_or_else(|e| panic!("Failed to read {}: {:?}", &path, e));
+
+        let r12: u64;
+
+        unsafe {
+            // Read current heap pointer from r12
+            asm!("nop" : "={r12}"(r12) ::: "intel");
+        }
+
+        let heap = r12 as *mut usize;
+        let str = (r12 + 8) as *mut u8;
+
+        unsafe {
+            // Increment r12 to allocate space
+            asm!("add r12, $0" :: "m"(data.len()) :: "intel");
+
+            //TODO: Understand why this is not `*heap = data.len();`
+            // Write prefix length
+            std::ptr::write(heap, data.len());
+
+            // Write data
+            std::ptr::copy(data.as_ptr(), str, data.len());
+        }
+
+        // Return immediate encoded string object
+        heap as i64 | STR
     }
 }

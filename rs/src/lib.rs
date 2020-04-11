@@ -1,6 +1,8 @@
 #![feature(bindings_after_at)] // For Lambda(code @ Code { name: Some(n), .. }) => {
 #![feature(box_syntax, box_patterns)]
 #![feature(inner_deref)] // For Option::as_deref
+#![feature(asm)]
+
 /*!
 # An Incremental scheme compiler
 

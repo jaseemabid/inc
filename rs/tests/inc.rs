@@ -570,10 +570,26 @@ mod io {
 
                   (f (open-output-file "/tmp/inc/io.txt")))
 
-             (writeln "hello world" f))"#;
+             (rt-write "hello world\n" f))"#;
 
         test1(k, "()");
         assert_eq!("hello world\n", read_to_string("/tmp/inc/io.txt").unwrap())
+    }
+
+    #[test]
+    fn read() {
+        fs::write("/tmp/inc/test.txt", "mordor")
+            .unwrap_or_else(|e| panic!("Failed to write test file {}", e));
+
+        let k = r#"
+            (let ((open-input-file (lambda (fname)
+                                     (let ((fd (rt-open-read fname)))
+                                      (vector 'port fname fd))))
+
+                  (f (open-input-file "/tmp/inc/test.txt")))
+             (rt-read f))"#;
+
+        test1(k, r#""mordor""#);
     }
 }
 
