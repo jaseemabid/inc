@@ -25,7 +25,7 @@
 CFLAGS = -g -ggdb3 -m64 -Wall -Wno-override-module -fno-asynchronous-unwind-tables -fomit-frame-pointer
 
 .DEFAULT_GOAL := inc
-inc: runtime.c inc.s
+inc: inc.h runtime.c inc.s
 	$(CC) -L./target/debug $(CFLAGS) $^ -linc -ldl -lpthread -o inc
 
 # cargo install --force cbindgen
