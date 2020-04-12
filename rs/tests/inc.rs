@@ -578,6 +578,8 @@ mod io {
 
     #[test]
     fn read() {
+        fs::create_dir_all(TEST_FOLDER)
+            .unwrap_or_else(|e| panic!("Failed to create test folder {}", e));
         fs::write("/tmp/inc/test.txt", "mordor")
             .unwrap_or_else(|e| panic!("Failed to write test file {}", e));
 
