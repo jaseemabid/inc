@@ -154,6 +154,10 @@ fn vec_nth(val: i64, n: i64) -> i64 {
 }
 
 /// Read current heap pointer from r12
+///
+/// See LLVM docs on [Inline Assembler
+/// Expressions](https://llvm.org/docs/LangRef.html#inline-assembler-expressions)
+/// to learn more.
 pub fn heap() -> usize {
     let r12: usize;
     unsafe {
