@@ -60,15 +60,22 @@
 //! simplicity when possible.
 //!
 //! Arguments are passed in the registers RDI, RSI, RDX, RCX, R8, R9 and the
-//! return value is passed back in RAX. Functions preserve the registers RBX,
-//! RSP, RBP, R12, R13, R14, and R15; while RAX, RDI, RSI, RDX, RCX, R8, R9,
-//! R10, R11 are scratch registers.
+//! return value is passed back in RAX. Registers RBX, RSP, RBP, R12, R13, R14,
+//! and R15 are preserved by the callee - these are saved on the callee's stack
+//! and restored before the function returns and any changes made to the
+//! registers in the function will be lost after it returns. Registers RAX, RDI,
+//! RSI, RDX, RCX, R8, R9, R10, R11 are similarly saved by the caller if needed.
 //!
 //! ## Reference Reading
 //!
 //! 1. [x86 calling conventions](https://en.wikipedia.org/wiki/X86_calling_conventions)
 //! 1. [System V ABI](https://wiki.osdev.org/System_V_ABI)
 //! 1. [System V Application Binary Interface](https://github.com/jaseemabid/inc/blob/master/docs/Sys%20V%20ABI.pdf)
+//! 1. [What are callee and caller saved registers?](https://stackoverflow.com/questions/9268586/what-are-callee-and-caller-saved-registers)
+//1 1. [Understanding how function call works](https://zhu45.org/posts/2017/Jul/30/understanding-how-function-call-works/)
+//! 1. [Slides: Assembly Language: Function Calls](https://www.cs.princeton.edu/courses/archive/spr11/cos217/lectures/15AssemblyFunctions.pdf)
+//! 1. [Inline Assembly](https://wiki.osdev.org/Inline_assembly)
+//! 1. [Rust book on inline assembly](https://doc.rust-lang.org/1.8.0/book/inline-assembly.html)
 //!
 //! [cdecl]: https://en.wikipedia.org/wiki/X86_calling_conventions#cdecl
 //! [history]: https://devblogs.microsoft.com/oldnewthing/?p=41213
