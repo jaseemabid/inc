@@ -1,8 +1,7 @@
 //! Scheme primitives implemented within the compiler.
 //!
-//! Scheme primitives naively understood by the compiler like
-//! [car](primitives::car) and [cdr](primitives::cdr) are implemented in this
-//! module.
+//! Scheme primitives naively understood by the compiler like [car] and [cdr]
+//! are implemented in this module.
 //!
 //! Preferably a function should be defined in the scheme stdlib, if not
 //! possible it should be written as a foreign function in Rust or C.
@@ -22,6 +21,7 @@ use crate::{
     x86::{self, Reference::*, Register::*, *},
 };
 
+/// Call compiler primitive by name
 pub fn call(s: &mut State, fname: &str, args: &[Expr]) -> Option<ASM> {
     match (fname, args) {
         ("%", [x, y]) => Some(remainder(s, x, y)),

@@ -16,10 +16,10 @@ as a small set of tests that's always checked for.
 
 ### 2. Rust Runtime functions implemented in Rust
 
-Functions like [string-length](rt::string_length) understands the memory layout
-of the objects and is probably easiest done in Rust instead of Scheme. Low level
-memory handling and bit fiddling is where Rust shines and there is no need to
-migrate it all into Scheme.
+Functions like [string-length](crate::rt::string_length) understands the memory
+layout of the objects and is probably easiest done in Rust instead of Scheme.
+Low level memory handling and bit fiddling is where Rust shines and there is no
+need to migrate it all into Scheme.
 
 Code here is expressive, powerful and easy to maintain thanks to Rust.
 
@@ -42,14 +42,15 @@ lowest level of implementation details like register allocation.
 
 With great power comes great responsibility!
 
-Some functions like [car](primitives::car) or [cdr](primitives::cdr) are at the
-very core of this implementation and it makes sense to leave them as primitives
-even though they maybe implemented in Rust. Specific cases like inlining strings
-and symbols are best implemented here. You don't really have to implement `+`
-and `*` as a primitive, but it allows the compiler to not treat them as function
-calls and emit a single efficient instruction immediately. I'd consider a
-compiler performing basic math during compilation as form of interpretation -
-inc doesn't do this, but is fairly trivial to implement.
+Some functions like [car](crate::primitives::car) or
+[cdr](crate::primitives::cdr) are at the very core of this implementation and it
+makes sense to leave them as primitives even though they maybe implemented in
+Rust. Specific cases like inlining strings and symbols are best implemented
+here. You don't really have to implement `+` and `*` as a primitive, but it
+allows the compiler to not treat them as function calls and emit a single
+efficient instruction immediately. I'd consider a compiler performing basic math
+during compilation as form of interpretation - inc doesn't do this, but is
+fairly trivial to implement.
 
 Some of the type checks are implemented as primitives for now, but they need not
 be.
