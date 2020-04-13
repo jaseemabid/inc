@@ -1,2 +1,5 @@
+# Enable auto loading this file in global settings:
+# echo "add-auto-load-safe-path /home/j/src/inc/rs/.gdbinit" > ~/.gdbinit
+
 set startup-with-shell off
-target remote 127.0.0.1:8080
+set env LD_LIBRARY_PATH target/debug
