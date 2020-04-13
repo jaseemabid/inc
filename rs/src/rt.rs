@@ -153,6 +153,83 @@ fn vec_nth(val: i64, n: i64) -> i64 {
     unsafe { *((val - VEC + WORDSIZE + (n * WORDSIZE)) as *const i64) }
 }
 
+/// Read current heap pointer from r12
+pub fn heap() -> usize {
+    let r12: usize;
+    unsafe {
+        asm!("nop" : "={r12}"(r12) ::: "intel");
+    }
+    r12
+}
+
+/// Allocate space on the scheme heap
+///
+/// In terms of lines of machine code vs time taken to write, this function tops
+/// the chart for me by a huge factor. Took about 2 days to write something that
+/// would run for 2 or 3ns.
+///
+/// This function compiles down to something like this:
+///
+/// ```asm
+/// inc::rt::allocate:
+///     push    rax
+///     add     rdi, 7
+///     and     rdi, -8
+///     mov     qword, ptr, [rsp], rdi
+///     add     r12, qword, ptr, [rsp]
+///     pop     rax
+///     ret
+/// ```
+///
+/// The *correct* way to write this function is to mark r12 as clobbered - tell
+/// the compiler explicitly that register r12 will be modified. This is done
+/// with the 4th argument to
+/// [std::asm!](https://doc.rust-lang.org/std/macro.asm.html) macro.
+///
+/// ```rs
+/// asm!("add r12, $0" :: "m"(aligned) : "r12" : "intel");
+/// ```
+///
+/// As per [System V Calling Convention](crate::x86), `r12` is a callee saved
+/// register and a function is supposed to leave it as it is found. Rust
+/// compiler explicitly adds a `push r12` at the beginning of the function and
+/// restores it before returning with explicit clobbers.
+///
+/// ```asm
+/// inc::rt::allocate:
+///     push    r12                     <- Save r12
+///     push    rax
+///     add     rdi, 7
+///     and     rdi, -8
+///     mov     qword, ptr, [rsp], rdi
+///     add     r12, qword, ptr, [rsp]
+///     add     rsp, 8
+///     pop     r12                     <- Restore r12
+///     ret
+/// ```
+///
+/// As far I understand, only the second version is correct as per the calling
+/// convention. Rust compiler should have added the 2 additional instructions
+/// even in the first version. Maybe this is the responsibility of the inline
+/// asm block, I'm not sure.
+///
+/// This silly runtime use r12 as a global value and needs it to be mutated (and
+/// I designed it that way before I learned what I just wrote here), so I need
+/// rustc to generate the first version even though its not quite right.
+///
+/// I really don't know if I'm relying on some rustc bug or if this is OK. Here
+/// is a [minimal reproduction example](https://godbolt.org/z/MM6ezC).
+///
+/// Know better? Please let me know!
+pub fn allocate(size: usize) {
+    let aligned = ((size + 7) / 8) * 8;
+
+    unsafe {
+        // Increment r12 to allocate space
+        asm!("add r12, $0" :: "m"(aligned) :: "intel");
+    }
+}
+
 /// IO Primitives for Inc
 pub mod io {
     use super::*;

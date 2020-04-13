@@ -595,6 +595,20 @@ mod io {
     }
 }
 
+mod rt {
+    use super::*;
+    use inc::rt;
+
+    #[test]
+    fn alloc() {
+        let old = rt::heap();
+        rt::allocate(15);
+        let new = rt::heap();
+
+        assert_eq!(new, old + 16);
+    }
+}
+
 // Get a test config with program as input
 fn config(base_folder: &str, program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which
