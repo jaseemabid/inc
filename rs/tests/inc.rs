@@ -580,18 +580,24 @@ mod io {
     fn read() {
         fs::create_dir_all(TEST_FOLDER)
             .unwrap_or_else(|e| panic!("Failed to create test folder {}", e));
-        fs::write("/tmp/inc/test.txt", "mordor")
-            .unwrap_or_else(|e| panic!("Failed to write test file {}", e));
+
+        fs::write("/tmp/inc/hello.txt", "hello ").unwrap();
+        fs::write("/tmp/inc/world.txt", "world").unwrap();
 
         let k = r#"
             (let ((open-input-file (lambda (fname)
                                      (let ((fd (rt-open-read fname)))
-                                      (vector 'port fname fd))))
+                                       (vector 'port fname fd))))
 
-                  (f (open-input-file "/tmp/inc/test.txt")))
-             (rt-read f))"#;
+                  (f1 (open-input-file "/tmp/inc/hello.txt"))
+                  (hello (rt-read f1))
 
-        test1(k, r#""mordor""#);
+                  (f2 (open-input-file "/tmp/inc/world.txt"))
+                  (world (rt-read f2)))
+
+              (cons hello world))"#;
+
+        test1(k, r#"("hello " . "world")"#);
     }
 }
 

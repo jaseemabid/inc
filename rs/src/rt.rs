@@ -295,29 +295,20 @@ pub mod io {
         let path = str_str(vec_nth(port, 1));
         let data = fs::read(&path).unwrap_or_else(|e| panic!("Failed to read {}: {:?}", &path, e));
 
-        let r12: u64;
+        let r12 = heap();
+
+        let plen = r12 as *mut usize;
+        let pstr = (r12 + 8) as *mut u8;
+
+        allocate(8 + data.len());
 
         unsafe {
-            // Read current heap pointer from r12
-            asm!("nop" : "={r12}"(r12) ::: "intel");
-        }
-
-        let heap = r12 as *mut usize;
-        let str = (r12 + 8) as *mut u8;
-
-        unsafe {
-            // Increment r12 to allocate space
-            asm!("add r12, $0" :: "m"(data.len()) :: "intel");
-
-            //TODO: Understand why this is not `*heap = data.len();`
-            // Write prefix length
-            std::ptr::write(heap, data.len());
-
-            // Write data
-            std::ptr::copy(data.as_ptr(), str, data.len());
+            // Write prefix length and then null terminated data
+            std::ptr::write(plen, data.len());
+            std::ptr::copy(data.as_ptr(), pstr, data.len());
         }
 
         // Return immediate encoded string object
-        heap as i64 | STR
+        plen as i64 | STR
     }
 }
