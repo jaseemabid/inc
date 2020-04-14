@@ -539,38 +539,21 @@ mod io {
 
     #[test]
     fn stdin() {
-        let k = r#"
-            (define (current-input-port)
-              (let ((fd (rt-current-input-port)))
-                (vector 'port "stdin" fd)))
-
-            (current-input-port)"#;
-
+        let k = r#"(current-input-port)"#;
         test1(k, r#"['port "stdin" 0]"#);
     }
 
     #[test]
     fn fd() {
-        let k = r#"
-            (let ((open-output-file (lambda (fname)
-                                     (let ((fd (rt-open-write fname)))
-                                      (vector 'port fname fd)))))
-
-             (open-output-file "/tmp/inc/io.txt"))"#;
-
+        let k = r#"(open-output-file "/tmp/inc/io.txt")"#;
         test1(k, r#"['port "/tmp/inc/io.txt" 4]"#);
     }
 
     #[test]
     fn write() {
         let k = r#"
-            (let ((open-output-file (lambda (fname)
-                                     (let ((fd (rt-open-write fname)))
-                                      (vector 'port fname fd))))
-
-                  (f (open-output-file "/tmp/inc/io.txt")))
-
-             (rt-write "hello world\n" f))"#;
+            (let ((f (open-output-file "/tmp/inc/io.txt")))
+              (rt-write "hello world\n" f))"#;
 
         test1(k, "()");
         assert_eq!("hello world\n", read_to_string("/tmp/inc/io.txt").unwrap())
@@ -585,11 +568,7 @@ mod io {
         fs::write("/tmp/inc/world.txt", "world").unwrap();
 
         let k = r#"
-            (let ((open-input-file (lambda (fname)
-                                     (let ((fd (rt-open-read fname)))
-                                       (vector 'port fname fd))))
-
-                  (f1 (open-input-file "/tmp/inc/hello.txt"))
+            (let ((f1 (open-input-file "/tmp/inc/hello.txt"))
                   (hello (rt-read f1))
 
                   (f2 (open-input-file "/tmp/inc/world.txt"))

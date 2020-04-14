@@ -16,7 +16,9 @@ pub enum Action {
 }
 
 pub fn run(config: &Config, action: Action) -> Result<Option<String>, Error> {
+    let prelude = parse(include_str!("prelude.ss"))?;
     let prog = parse(&config.program)?;
+    let prog = prelude.into_iter().chain(prog.into_iter()).collect();
 
     match action {
         Action::Parse => {
