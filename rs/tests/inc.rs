@@ -545,8 +545,8 @@ mod io {
 
     #[test]
     fn fd() {
-        let k = r#"(open-output-file "/tmp/inc/io.txt")"#;
-        test1(k, r#"['port "/tmp/inc/io.txt" 4]"#);
+        let k = r#"(open-input-file "/etc/hostname")"#;
+        test1(k, r#"['port "/etc/hostname" 4]"#);
     }
 
     #[test]
