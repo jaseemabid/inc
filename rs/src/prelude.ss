@@ -3,7 +3,7 @@
     (vector 'port fname fd)))
 
 (define (open-output-file fname)
-  (let ((fd (rt-open-read fname)))
+  (let ((fd (rt-open-write fname)))
     (vector 'port fname fd)))
 
 (define (current-input-port)
