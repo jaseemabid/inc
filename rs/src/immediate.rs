@@ -1,13 +1,13 @@
 //! Runtime representation of scheme objects
 //!
 //! Immediate values (values that can be fit in one machine word) are tagged for
-//! distinguising them from heap allocated pointers. The last 3 bits effectively
-//! serve as the runtime type of the value. Always using 3 bits is a simpler
-//! approach than the multi bit technique the paper uses. This is a very
-//! efficient and low overhead technique at the cost of losing precision -
-//! completely acceptable for types like characters and booleans but having to
-//! live with 61bit numerics instead of native 64 and some overhead for
-//! operations like multiplication & division.
+//! distinguising them from heap allocated pointers. The last 3 bits serve as
+//! the runtime type of the value. Always using 3 bits is a simpler approach
+//! than the multi bit technique the paper uses. This is a very efficient and
+//! low overhead technique at the cost of losing precision - completely
+//! acceptable for types like characters and booleans but having to live with
+//! 61bit numerics instead of native 64 and some overhead for operations like
+//! multiplication & division.
 //!
 //! See the paper for details. See tests for examples.
 
@@ -57,36 +57,13 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    // As of now, there is no need for this function in Rust other than
-    // testing, but good to have :) There is an equivalent C implementation
-    // to pretty print the values. Leaving this along with `to` leads to
-    // dead code warnings.
-    //
-    // TODO: Switch to match, rely on exhaustive pattern matching rather
-    // than the panic in the end.
-    pub fn from(val: i64) -> Expr {
-        if (val & MASK) == NUM {
-            Expr::Number(val >> SHIFT)
-        } else if (val & MASK) == CHAR {
-            Expr::Char((val >> SHIFT) as u8)
-        } else if val == TRUE {
-            true.into()
-        } else if val == FALSE {
-            false.into()
-        } else if val == NIL {
-            Expr::Nil
-        } else {
-            panic!("Oops")
-        }
-    }
-
     #[test]
     fn numbers() {
         assert_eq!(to(&0.into()), Some(0));
         assert_eq!(to(&1.into()), Some(8));
 
-        assert_eq!(from(0), 0.into());
-        assert_eq!(from(8), 1.into());
+        assert_eq!(Expr::Number(0), 0.into());
+        assert_eq!(Expr::Number(1), 1.into());
     }
 
     #[test]
