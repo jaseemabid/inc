@@ -24,6 +24,8 @@ pub enum Expr {
     // indirection here with `Vec<>` for recursive types. In this context, Vec
     // is just a convenient way to have a `Box<[Expr]>`
     List(Vec<Expr>),
+    // Vectors
+    Vector(Vec<Expr>),
     // Conditional
     Cond { pred: Box<Expr>, then: Box<Expr>, alt: Option<Box<Expr>> },
     // Variable bindings
@@ -106,7 +108,17 @@ impl fmt::Display for Expr {
                     write!(f, "{} ", i)?;
                 }
                 write!(f, ")")
-            }
+            },
+
+            // TODO: Pretty print ports differently from other vectors
+            // Example: #<input/output port stdin/out> | #<output port /tmp/foo.txt>
+            Expr::Vector(l) => {
+                write!(f, "[")?;
+                for i in l {
+                    write!(f, "{} ", i)?;
+                }
+                write!(f, "]")
+            },
             Expr::Cond { pred, then, alt } => match alt {
                 None => write!(f, "(if {} {})", pred, then),
                 Some(t) => write!(f, "(if {} {} {})", pred, then, t),
