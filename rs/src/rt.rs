@@ -6,6 +6,44 @@
 
 use crate::{immediate::*, x86::WORDSIZE};
 use std::{ffi::CStr, io::Write, os::raw::c_char};
+/// A scheme object
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct Object(pub i64);
+
+impl Object {
+    pub fn new(raw: i64) -> Self {
+        Object(raw)
+    }
+
+    pub fn immediate(num: i64) -> Self {
+        Object(immediate::n(num))
+    }
+
+    pub fn deref(&self) -> Expr {
+        match (self.0) & MASK {
+            NUM => Number(self.0 >> SHIFT),
+            BOOL => Boolean(self.0 == TRUE),
+            CHAR => Char((self.0 >> SHIFT) as u8),
+            PAIR => List(vec![car(*self).deref(), cdr(*self).deref()]),
+            NIL => Nil,
+            STR => {
+                // TODO: Read required bytes instead of looking for NUL
+                let s = unsafe { CStr::from_ptr((self.0 - STR + 8) as *const c_char) };
+                Str(s.to_string_lossy().into_owned())
+            }
+            SYM => {
+                let s = unsafe { CStr::from_ptr((self.0 - SYM + 16) as *const c_char) };
+                Symbol(s.to_string_lossy().into_owned())
+            }
+            VEC => Expr::Vector(
+                (0..vec_len(self.0)).map(|i| (Self::new(vec_nth(self.0, i)).deref())).collect(),
+            ),
+
+            _ => unreachable!("Tried to decode object from address {} and failed", self.0),
+        }
+    }
+}
 
 /// Checks if a function is defined in the built in runtime
 pub fn defined(name: &str) -> bool {
