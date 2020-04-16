@@ -217,8 +217,8 @@ impl<'a> fmt::Display for Error<'a> {
                 writeln!(f, "{:?}", e)
             }
             Self::Runtime(e) => {
-                writeln!(f, "{}\n", "Runtime error!".red().bold())?;
-                writeln!(f, "{:?}", e)
+                writeln!(f, "{}", "Runtime error!".red().bold())?;
+                writeln!(f, "{}", e)
             }
             Self::Compilation(e) => {
                 writeln!(f, "{}\n", "Failed to compile program".red().bold())?;

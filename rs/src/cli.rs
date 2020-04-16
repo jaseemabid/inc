@@ -115,7 +115,11 @@ pub fn exec(config: &Config) -> Result<Option<String>, Error> {
         //
         // Defined as `libc::SIGABRT` already, but no need to pull in a new crate
         // for just one constant.
-        Err(Error::Runtime(String::from("Child program aborted with SIGABRT")))
+        Err(Error::Runtime(
+            String::from("Child program aborted with SIGABRT\n")
+                + String::from_utf8_lossy(&exe.stdout).trim()
+                + String::from_utf8_lossy(&exe.stderr).trim(),
+        ))
     } else {
         Err(Error::Runtime(format!(
             "Child process failed with code: `{:?}` & signal: {:?}",
