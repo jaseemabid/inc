@@ -98,27 +98,47 @@ impl fmt::Display for Expr {
             Expr::Nil => write!(f, "()"),
             Expr::Number(n) => write!(f, "{}", n),
             Expr::Boolean(t) => write!(f, "{}", if *t { "#t" } else { "#f" }),
-            Expr::Char(c) => write!(f, "{}", c),
+            Expr::Char(c) => {
+                let p = match *c as char {
+                    '\t' => "#\\tab".into(),
+                    '\n' => "#\\newline".into(),
+                    '\r' => "#\\return".into(),
+                    ' ' => "#\\space".into(),
+                    _ => format!("#\\{}", *c as char),
+                };
+                write!(f, "{}", &p)
+            }
+
             Expr::Str(s) => write!(f, "\"{}\"", s),
             Expr::Identifier(Ident { name, index }) => write!(f, "{}.{}", name, index),
             Expr::Symbol(i) => write!(f, "'{}", i),
             Expr::List(l) => {
                 write!(f, "(")?;
-                for i in l {
-                    write!(f, "{} ", i)?;
+                let mut l = l.iter().peekable();
+                while let Some(elem) = l.next() {
+                    if l.peek().is_some() {
+                        write!(f, "{} ", elem)?;
+                    } else {
+                        write!(f, "{}", elem)?;
+                    }
                 }
                 write!(f, ")")
-            },
+            }
 
             // TODO: Pretty print ports differently from other vectors
             // Example: #<input/output port stdin/out> | #<output port /tmp/foo.txt>
             Expr::Vector(l) => {
                 write!(f, "[")?;
-                for i in l {
-                    write!(f, "{} ", i)?;
+                let mut l = l.iter().peekable();
+                while let Some(elem) = l.next() {
+                    if l.peek().is_some() {
+                        write!(f, "{} ", elem)?;
+                    } else {
+                        write!(f, "{}", elem)?;
+                    }
                 }
                 write!(f, "]")
-            },
+            }
             Expr::Cond { pred, then, alt } => match alt {
                 None => write!(f, "(if {} {})", pred, then),
                 Some(t) => write!(f, "(if {} {} {})", pred, then, t),
