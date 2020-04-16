@@ -237,26 +237,31 @@ pub fn allocate(size: usize) {
 /// IO Primitives for Inc
 pub mod io {
     use super::*;
+    use crate::immediate;
     use std::{
         fs::{self, File},
         os::unix::io::AsRawFd,
     };
 
+    const STDIN: i64 = 0;
+    const STDOUT: i64 = 1;
+    const STDERR: i64 = 2;
+
     // Standard ports can be overridden in Scheme, but these constants would do
     // for now
     #[no_mangle]
     pub extern "C" fn rt_current_input_port() -> i64 {
-        i64::from(0 << SHIFT)
+        immediate::n(STDIN)
     }
 
     #[no_mangle]
     pub extern "C" fn rt_current_output_port() -> i64 {
-        i64::from(1 << SHIFT)
+        immediate::n(STDOUT)
     }
 
     #[no_mangle]
     pub extern "C" fn rt_current_error_port() -> i64 {
-        i64::from(2 << SHIFT)
+        immediate::n(STDERR)
     }
 
     /// Open a file for writing and return the immediate encoded file descriptor
