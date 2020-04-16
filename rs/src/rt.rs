@@ -47,23 +47,22 @@ impl Object {
 
 /// Checks if a function is defined in the built in runtime
 pub fn defined(name: &str) -> bool {
-    SYMBOLS.contains(&name)
+    [
+        "exit",
+        "rt-current-error-port",
+        "rt-current-input-port",
+        "rt-current-output-port",
+        "rt-open-read",
+        "rt-open-write",
+        "rt-read",
+        "rt-write",
+        "string-length",
+        "symbol=?",
+        "type",
+    ]
+    .contains(&name)
 }
 
-// All symbols exported to the runtime from this module
-const SYMBOLS: [&str; 11] = [
-    "exit",
-    "rt-current-error-port",
-    "rt-current-input-port",
-    "rt-current-output-port",
-    "rt-open-write",
-    "rt-open-read",
-    "rt-read",
-    "rt-write",
-    "string-length",
-    "symbol=?",
-    "type",
-];
 
 #[no_mangle]
 pub extern "C" fn print(val: i64, nested: bool) {
