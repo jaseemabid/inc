@@ -284,8 +284,16 @@ pub mod io {
     #[no_mangle]
     pub extern "C" fn rt_write(data: i64, port: i64) -> i64 {
         let path = str_str(vec_nth(port, 1));
-        fs::write(&path, str_str(data)).unwrap_or_else(|_| panic!("Failed to write to {}", &path));
+        let fd = (vec_nth(port, 2) >> SHIFT) as i32;
 
+        if fd == STDOUT as i32 {
+            print(data, false)
+        } else {
+            fs::write(&path, str_str(data))
+                .unwrap_or_else(|_| panic!("Failed to write to {}", &path));
+        }
+
+        // TODO: Return values makes very little sense here. gotta rethink
         NIL
     }
 
