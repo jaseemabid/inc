@@ -84,7 +84,9 @@ int main() {
     fprintf(debug, "\n\n");
     fflush(stdout);
 
-    print(val, false);
+    Object p = {val};
+    print(p, false);
+
     printf("\n");
     fflush(stdout);
 

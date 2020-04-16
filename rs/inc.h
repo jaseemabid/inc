@@ -29,40 +29,47 @@
 
 #define WORDSIZE 8
 
-int64_t car(int64_t val);
+/**
+ * A scheme object
+ */
+typedef struct {
+  int64_t _0;
+} Object;
 
-int64_t cdr(int64_t val);
+Object car(Object val);
 
-void print(int64_t val, bool nested);
+Object cdr(Object val);
 
-int64_t rt_current_error_port(void);
+void print(Object val, bool nested);
 
-int64_t rt_current_input_port(void);
+Object rt_current_error_port(void);
 
-int64_t rt_current_output_port(void);
+Object rt_current_input_port(void);
+
+Object rt_current_output_port(void);
 
 /**
  * Open a file for reading return the immediate encoded file descriptor
  * Fails if file doesn't exist already
  */
-int64_t rt_open_read(int64_t fname);
+Object rt_open_read(Object fname);
 
 /**
  * Open a file for writing and return the immediate encoded file descriptor
  * Creates file if it doesn't exist already
  */
-int64_t rt_open_write(int64_t fname);
+Object rt_open_write(Object fname);
 
 /**
  * Read string from a port object
  */
-int64_t rt_read(int64_t port);
+Object rt_read(Object port);
 
 /**
  * Write a string object to a port
  */
-int64_t rt_write(int64_t data, int64_t port);
+Object rt_write(Object data, Object port);
 
-uintptr_t string_length(int64_t val);
+Object string_length(int64_t val);
 
 int64_t symbol_eq(int64_t a, int64_t b);

@@ -4,8 +4,14 @@
 //! low level nuances. Functions defined here are available at runtime to be
 //! called from scheme functions.
 
-use crate::{immediate::*, x86::WORDSIZE};
-use std::{ffi::CStr, io::Write, os::raw::c_char};
+use crate::{
+    core::{Expr, Expr::*},
+    immediate::{self, *},
+    x86::WORDSIZE,
+};
+
+use std::{convert::TryFrom, ffi::CStr, io::Write, os::raw::c_char};
+
 /// A scheme object
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -65,21 +71,8 @@ pub fn defined(name: &str) -> bool {
 
 
 #[no_mangle]
-pub extern "C" fn print(val: i64, nested: bool) {
-    match val & MASK {
-        NUM => print!("{}", val >> SHIFT),
-        BOOL => print!("{}", if val == TRUE { "#t" } else { "#f" }),
-        CHAR => {
-            let c = ((val >> SHIFT) as u8) as char;
-            let p = match c {
-                '\t' => "#\\tab".into(),
-                '\n' => "#\\newline".into(),
-                '\r' => "#\\return".into(),
-                ' ' => "#\\space".into(),
-                _ => format!("#\\{}", c),
-            };
-            print!("{}", &p)
-        }
+pub extern "C" fn print(val: Object, nested: bool) {
+    match val.0 & MASK {
         PAIR => {
             let pcar = car(val);
             let pcdr = cdr(val);
@@ -90,8 +83,8 @@ pub extern "C" fn print(val: i64, nested: bool) {
 
             print(pcar, false);
 
-            if pcdr != NIL {
-                if (pcdr & MASK) != PAIR {
+            if pcdr.0 != NIL {
+                if (pcdr.0 & MASK) != PAIR {
                     print!(" . ");
                     print(pcdr, false);
                 } else {
@@ -103,55 +96,31 @@ pub extern "C" fn print(val: i64, nested: bool) {
                 print!(")")
             };
         }
-        NIL => {
-            print!("()");
-        }
-        STR => print!("\"{}\"", str_str(val)),
-        SYM => print!("'{}", sym_name(val)),
-
-        // TODO: Pretty print ports differently from other vectors
-        // Example: #<input/output port stdin/out> | #<output port /tmp/foo.txt>
-        VEC => {
-            print!("[");
-
-            for i in 0..vec_len(val) {
-                print(vec_nth(val, i), false);
-
-                if i != vec_len(val) - 1 {
-                    print!(" ");
-                }
-            }
-
-            print!("]");
-
-            std::io::stdout().flush().unwrap();
-        }
-        _ => panic!("Unexpected value returned by runtime: {}", val),
+        _ => print!("{}", val.deref()),
     }
 
     std::io::stdout().flush().unwrap();
 }
 
 #[no_mangle]
-pub extern "C" fn car(val: i64) -> i64 {
-    assert!((val & MASK) == PAIR);
+pub extern "C" fn car(val: Object) -> Object {
+    assert!(((val.0) & MASK) == PAIR);
 
-    unsafe { *((val - PAIR) as *mut i64) }
+    Object::new(unsafe { *((val.0 - PAIR) as *mut i64) })
 }
 
 #[no_mangle]
-pub extern "C" fn cdr(val: i64) -> i64 {
-    assert!((val & MASK) == PAIR);
-
-    unsafe { *((val - PAIR + 8) as *mut i64) }
+pub extern "C" fn cdr(val: Object) -> Object {
+    assert!((val.0 & MASK) == PAIR);
+    Object::new(unsafe { *((val.0 - PAIR + 8) as *mut i64) })
 }
 
 #[no_mangle]
-pub extern "C" fn string_length(val: i64) -> usize {
+pub extern "C" fn string_length(val: i64) -> Object {
     assert!((val & MASK) == STR);
 
     let len = unsafe { *((val - STR) as *mut usize) };
-    len << SHIFT
+    Object::immediate(i64::try_from(len).unwrap())
 }
 
 #[no_mangle]
@@ -168,13 +137,6 @@ fn str_str(val: i64) -> String {
     assert!((val & MASK) == STR);
 
     let s = unsafe { CStr::from_ptr((val - STR + 8) as *const c_char) };
-    s.to_string_lossy().into_owned()
-}
-
-fn sym_name(val: i64) -> String {
-    assert!((val & MASK) == SYM);
-
-    let s = unsafe { CStr::from_ptr((val - SYM + 16) as *const c_char) };
     s.to_string_lossy().into_owned()
 }
 
@@ -274,7 +236,6 @@ pub fn allocate(size: usize) {
 /// IO Primitives for Inc
 pub mod io {
     use super::*;
-    use crate::immediate;
     use std::{
         fs::{self, File},
         os::unix::io::AsRawFd,
@@ -287,51 +248,61 @@ pub mod io {
     // Standard ports can be overridden in Scheme, but these constants would do
     // for now
     #[no_mangle]
-    pub extern "C" fn rt_current_input_port() -> i64 {
-        immediate::n(STDIN)
+    pub extern "C" fn rt_current_input_port() -> Object {
+        Object::immediate(STDIN)
     }
 
     #[no_mangle]
-    pub extern "C" fn rt_current_output_port() -> i64 {
-        immediate::n(STDOUT)
+    pub extern "C" fn rt_current_output_port() -> Object {
+        Object::immediate(STDOUT)
     }
 
     #[no_mangle]
-    pub extern "C" fn rt_current_error_port() -> i64 {
-        immediate::n(STDERR)
+    pub extern "C" fn rt_current_error_port() -> Object {
+        Object::immediate(STDERR)
     }
 
     /// Open a file for writing and return the immediate encoded file descriptor
     /// Creates file if it doesn't exist already
     #[no_mangle]
-    pub extern "C" fn rt_open_write(fname: i64) -> i64 {
-        let f = File::create(str_str(fname)).unwrap().as_raw_fd();
-        i64::from(f << SHIFT)
+    pub extern "C" fn rt_open_write(fname: Object) -> Object {
+        match fname.deref() {
+            Str(path) => {
+                let f = File::create(path).unwrap().as_raw_fd();
+                Object::immediate(f as i64)
+            }
+            e => panic!("Expected fname: String, got `{}` instead", e),
+        }
     }
 
     /// Open a file for reading return the immediate encoded file descriptor
     /// Fails if file doesn't exist already
     #[no_mangle]
-    pub extern "C" fn rt_open_read(fname: i64) -> i64 {
-        let f = File::open(str_str(fname)).unwrap().as_raw_fd();
-        i64::from(f << SHIFT)
+    pub extern "C" fn rt_open_read(fname: Object) -> Object {
+        match fname.deref() {
+            Str(path) => {
+                let f = File::open(path).unwrap().as_raw_fd();
+                Object::immediate(f as i64)
+            }
+            e => panic!("Expected fname: String, got `{}` instead", e),
+        }
     }
 
     /// Write a string object to a port
     #[no_mangle]
-    pub extern "C" fn rt_write(data: i64, port: i64) -> i64 {
-        let path = str_str(vec_nth(port, 1));
-        let fd = (vec_nth(port, 2) >> SHIFT) as i32;
+    pub extern "C" fn rt_write(data: Object, port: Object) -> Object {
+        let path = str_str(vec_nth(port.0, 1));
+        let fd = (vec_nth(port.0, 2) >> SHIFT) as i32;
 
         if fd == STDOUT as i32 {
             print(data, false)
         } else {
-            fs::write(&path, str_str(data))
+            fs::write(&path, str_str(data.0))
                 .unwrap_or_else(|_| panic!("Failed to write to {}", &path));
         }
 
         // TODO: Return values makes very little sense here. gotta rethink
-        NIL
+        Object::new(NIL)
     }
 
     /// Read string from a port object
@@ -345,8 +316,8 @@ pub mod io {
     // This is legit cursed!
     #[no_mangle]
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    pub extern "C" fn rt_read(port: i64) -> i64 {
-        let path = str_str(vec_nth(port, 1));
+    pub extern "C" fn rt_read(port: Object) -> Object {
+        let path = str_str(vec_nth(port.0, 1));
         let data = fs::read(&path).unwrap_or_else(|e| panic!("Failed to read {}: {:?}", &path, e));
 
         let r12 = heap();
@@ -363,6 +334,6 @@ pub mod io {
         }
 
         // Return immediate encoded string object
-        plen as i64 | STR
+        Object::new(plen as i64 | STR)
     }
 }
