@@ -1,4 +1,5 @@
 //! Core types shared by most of the program
+use self::Expr::*;
 use colored::Colorize;
 use std::fmt;
 
@@ -78,6 +79,17 @@ pub struct Code {
     pub body: Vec<Expr>,
     // Is this a tail call?
     pub tail: bool,
+}
+
+impl Expr {
+    /// Checks if an expression is in [A-Normal Form](https://en.wikipedia.org/wiki/A-normal_form)
+    pub fn anf(&self) -> bool {
+        match self {
+            Nil | Number(..) | Boolean(..) | Char(..) => true,
+            Str(..) | Identifier(..) | Symbol(..) | Vector(..) => true,
+            List(..) | Cond { .. } | Let { .. } | Lambda { .. } => false,
+        }
+    }
 }
 
 /// Pretty print an Expr

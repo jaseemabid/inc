@@ -557,9 +557,7 @@ mod io {
 
     #[test]
     fn write_to_file() {
-        let k = r#"
-            (let ((f (open-output-file "/tmp/inc/io.txt")))
-              (rt-write "hello world\n" f))"#;
+        let k = r#"(rt-write "hello world\n" (open-output-file "/tmp/inc/io.txt"))"#;
 
         test1(k, "()");
         assert_eq!("hello world\n", read_to_string("/tmp/inc/io.txt").unwrap())
@@ -567,9 +565,7 @@ mod io {
 
     #[test]
     fn write_to_stdout() {
-        let k = r#"(let ((f (current-output-port)))
-                     (rt-write "hello world" f))"#;
-
+        let k = r#"(rt-write "hello world" (current-output-port))"#;
         test1(k, "\"hello world\"()");
     }
 

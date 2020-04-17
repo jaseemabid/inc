@@ -179,6 +179,55 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
     }
 }
 
+/// Convert an expression into [ANF](https://en.wikipedia.org/wiki/A-normal_form)
+///
+/// Break down complex expressions into a let binding with locals.
+///
+/// The generated names are NOT guaranteed to be unique and could be a problem
+/// down the line.
+pub fn anf(prog: Vec<Expr>) -> Vec<Expr> {
+    prog.into_iter().map(|expr| anf1(expr)).collect()
+}
+
+fn anf1(prog: Expr) -> Expr {
+    match prog {
+        List(list) => {
+            let (car, cdr) = list.split_at(1);
+
+            // IF all arguments are already in normal form, return as is it
+            if cdr.iter().all(|e| e.anf()) {
+                return List(list);
+            } else {
+                // Collect variables that will be bound to a new let block
+                let bindings = cdr
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| ((Ident::new(format!("_{}", i)), e.clone())))
+                    .filter(|(_, e)| !e.anf());
+
+                // Collect arguments for the function call where complex
+                // expressions are replaced with a variable name
+                let args: Vec<Expr> = cdr
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, e)| {
+                        if e.anf() {
+                            e.clone()
+                        } else {
+                            Identifier(Ident::new(format!("_{}", i)))
+                        }
+                    })
+                    .collect();
+
+                let body: Expr = List(car.into_iter().chain(args.iter()).cloned().collect());
+
+                return Let { bindings: bindings.collect(), body: vec![body] };
+            }
+        }
+        e => e.clone(),
+    }
+}
+
 // Shrink a vector of expressions into a single expression
 //
 // TODO: Replace with `(begin ...)`, list really isn't the same thing
@@ -291,6 +340,14 @@ mod tests {
         let y = parse1("(let ((x.0 1)) (let ((x.1 x.0)) (+ x.1 x.1)))");
 
         assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
+    }
+
+    #[test]
+    fn anf() {
+        let x = parse1("(f (+ 1 2) 7)");
+        let y = parse1("(let ((_0 (+ 1 2))) (f _0 7))");
+
+        assert_eq!(y, anf1(x));
     }
 
     #[test]
