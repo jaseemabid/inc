@@ -42,12 +42,6 @@ Object cdr(Object val);
 
 void print(Object val, bool nested);
 
-Object rt_current_error_port(void);
-
-Object rt_current_input_port(void);
-
-Object rt_current_output_port(void);
-
 /**
  * Open a file for reading return the immediate encoded file descriptor
  * Fails if file doesn't exist already
@@ -64,6 +58,12 @@ Object rt_open_write(Object fname);
  * Read string from a port object
  */
 Object rt_read(Object port);
+
+Object rt_standard_error_port(void);
+
+Object rt_standard_input_port(void);
+
+Object rt_standard_output_port(void);
 
 /**
  * Write a string object to a port

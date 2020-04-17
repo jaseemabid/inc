@@ -7,13 +7,13 @@
     (vector 'port fname fd)))
 
 (define (current-input-port)
-  (let ((fd (rt-current-input-port)))
+  (let ((fd (rt-standard-input-port)))
     (vector 'port "stdin" fd)))
 
 (define (current-output-port)
-  (let ((fd (rt-current-output-port)))
+  (let ((fd (rt-standard-output-port)))
     (vector 'port "stdout" fd)))
 
 (define (current-error-port)
-  (let ((fd (rt-current-error-port)))
-    (vector 'port "stdout" fd)))
+  (let ((fd (rt-standard-error-port)))
+    (vector 'port "stderr" fd)))

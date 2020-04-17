@@ -55,9 +55,9 @@ impl Object {
 pub fn defined(name: &str) -> bool {
     [
         "exit",
-        "rt-current-error-port",
-        "rt-current-input-port",
-        "rt-current-output-port",
+        "rt-standard-error-port",
+        "rt-standard-input-port",
+        "rt-standard-output-port",
         "rt-open-read",
         "rt-open-write",
         "rt-read",
@@ -68,7 +68,6 @@ pub fn defined(name: &str) -> bool {
     ]
     .contains(&name)
 }
-
 
 #[no_mangle]
 pub extern "C" fn print(val: Object, nested: bool) {
@@ -234,6 +233,11 @@ pub fn allocate(size: usize) {
 }
 
 /// IO Primitives for Inc
+///
+/// This is a an extremely simpllified attempt at stealing the minimum required
+/// bits from the spec to make some toy programs work.
+///
+/// See: https://www.scheme.com/tspl4/io.html
 pub mod io {
     use super::*;
     use std::{
@@ -245,20 +249,18 @@ pub mod io {
     const STDOUT: i64 = 1;
     const STDERR: i64 = 2;
 
-    // Standard ports can be overridden in Scheme, but these constants would do
-    // for now
     #[no_mangle]
-    pub extern "C" fn rt_current_input_port() -> Object {
+    pub extern "C" fn rt_standard_input_port() -> Object {
         Object::immediate(STDIN)
     }
 
     #[no_mangle]
-    pub extern "C" fn rt_current_output_port() -> Object {
+    pub extern "C" fn rt_standard_output_port() -> Object {
         Object::immediate(STDOUT)
     }
 
     #[no_mangle]
-    pub extern "C" fn rt_current_error_port() -> Object {
+    pub extern "C" fn rt_standard_error_port() -> Object {
         Object::immediate(STDERR)
     }
 

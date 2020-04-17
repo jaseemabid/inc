@@ -538,9 +538,15 @@ mod io {
     use std::fs::read_to_string;
 
     #[test]
-    fn stdin() {
+    fn std_ports() {
         let k = r#"(current-input-port)"#;
         test1(k, r#"['port "stdin" 0]"#);
+
+        let k = r#"(current-output-port)"#;
+        test1(k, r#"['port "stdout" 1]"#);
+
+        let k = r#"(current-error-port)"#;
+        test1(k, r#"['port "stderr" 2]"#);
     }
 
     #[test]
