@@ -7,6 +7,7 @@ use crate::{
 };
 
 use std::{fs::File, io::Write, path::PathBuf, process::Command};
+use libc;
 
 #[derive(Copy, Clone)]
 pub enum Action {
@@ -110,11 +111,8 @@ pub fn exec(config: &Config) -> Result<Option<String>, Error> {
             String::from_utf8_lossy(&exe.stdout).trim().to_string()
                 + String::from_utf8_lossy(&exe.stderr).trim(),
         ))
-    } else if exe.status.signal() == Some(6) {
+    } else if exe.status.signal() == Some(libc::SIGABRT) {
         // SIGABRT is #defined as 6 in /usr/include/asm/signal.h
-        //
-        // Defined as `libc::SIGABRT` already, but no need to pull in a new crate
-        // for just one constant.
         Err(Error::Runtime(
             String::from("Child program aborted with SIGABRT\n")
                 + String::from_utf8_lossy(&exe.stdout).trim()
