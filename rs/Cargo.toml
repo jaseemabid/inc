@@ -14,7 +14,7 @@ crate_type = ["dylib", "rlib"]
 path       = "src/lib.rs"
 
 [[bin]]
-name = "ss"
+name = "inc"
 path = "src/main.rs"
 
 [dependencies]
