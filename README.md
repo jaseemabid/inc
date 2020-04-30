@@ -2,7 +2,8 @@
 
 🐳 A tiny educational [Scheme][wiki] compiler written in Rust that generates
 readable x86 assembly. Implements the paper [An Incremental Approach to Compiler
-Construction][paper] by Abdulaziz Ghuloum.
+Construction][paper] by Abdulaziz Ghuloum. We aim to be complete, correct and fast,
+in that order of importance.
 
 ## Getting started
 
