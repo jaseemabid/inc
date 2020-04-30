@@ -159,7 +159,7 @@ fn vec_nth(val: i64, n: i64) -> i64 {
 pub fn heap() -> usize {
     let r12: usize;
     unsafe {
-        asm!("nop" : "={r12}"(r12) ::: "intel");
+        llvm_asm!("nop" : "={r12}"(r12) ::: "intel");
     }
     r12
 }
@@ -228,7 +228,7 @@ pub fn allocate(size: usize) {
 
     unsafe {
         // Increment r12 to allocate space
-        asm!("add r12, $0" :: "m"(aligned) :: "intel");
+        llvm_asm!("add r12, $0" :: "m"(aligned) :: "intel");
     }
 }
 
