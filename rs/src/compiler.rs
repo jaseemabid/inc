@@ -140,7 +140,7 @@ pub mod state {
             assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-8)));
 
             // overwrite in current scope
-            e.set(Ident::from("x"), Reference::from(Reference::from(-16)));
+            e.set(Ident::from("x"), Reference::from(-16));
             assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-16)));
 
             e.enter();

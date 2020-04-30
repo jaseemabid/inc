@@ -7,7 +7,6 @@ use crate::{
 };
 
 use std::{fs::File, io::Write, path::PathBuf, process::Command};
-use libc;
 
 #[derive(Copy, Clone)]
 pub enum Action {
