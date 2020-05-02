@@ -398,6 +398,16 @@ impl Add<Ins> for Ins {
     }
 }
 
+impl Add<ASM> for Ins {
+    type Output = ASM;
+
+    fn add(self, asm: ASM) -> ASM {
+        let mut v = vec![self];
+        v.append(&mut asm.0.clone());
+        ASM { 0: v }
+    }
+}
+
 /// Add operations with a easy to read `asm += op` short hand.
 ///
 /// This is pretty efficient at the cost of owning the value.
