@@ -246,7 +246,8 @@ fn cons(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     // 6. Deallocate a word used for first arg
     let bp = s.si;
     let scratch = s.alloc();
-    let ctx = eval(s, x)
+    let ctx = Ins(format!("# (cons {} {})", x, y))
+        + eval(s, x)
         + x86::save(RAX.into(), scratch)
         + eval(s, y)
         + x86::mov(Reference::from(R12 + 8), RAX.into())
