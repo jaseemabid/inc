@@ -679,7 +679,7 @@ mod tests {
 
 /// Parse a single expression for testing, return or panic
 #[cfg(test)]
-pub fn parse1<'a>(i: &'a str) -> Expr {
+pub fn parse1(i: &str) -> Expr {
     match form(i) {
         Ok((_rest, e)) => e,
         Err(e) => panic!("Failed to parse `{}`: {:?}", i, e),
