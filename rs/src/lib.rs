@@ -2,6 +2,8 @@
 #![feature(box_syntax, box_patterns)]
 #![feature(inner_deref)] // For Option::as_deref
 #![feature(llvm_asm)]
+#![feature(const_extern_fn)]
+#![deny(clippy::missing_const_for_fn)]
 
 /*!
 # An Incremental scheme compiler

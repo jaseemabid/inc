@@ -18,11 +18,11 @@ use std::{convert::TryFrom, ffi::CStr, io::Write, os::raw::c_char};
 pub struct Object(pub i64);
 
 impl Object {
-    pub fn new(raw: i64) -> Self {
+    pub const fn new(raw: i64) -> Self {
         Object(raw)
     }
 
-    pub fn immediate(num: i64) -> Self {
+    pub const fn immediate(num: i64) -> Self {
         Object(immediate::n(num))
     }
 
@@ -250,17 +250,17 @@ pub mod io {
     const STDERR: i64 = 2;
 
     #[no_mangle]
-    pub extern "C" fn rt_standard_input_port() -> Object {
+    pub const extern "C" fn rt_standard_input_port() -> Object {
         Object::immediate(STDIN)
     }
 
     #[no_mangle]
-    pub extern "C" fn rt_standard_output_port() -> Object {
+    pub const extern "C" fn rt_standard_output_port() -> Object {
         Object::immediate(STDOUT)
     }
 
     #[no_mangle]
-    pub extern "C" fn rt_standard_error_port() -> Object {
+    pub const extern "C" fn rt_standard_error_port() -> Object {
         Object::immediate(STDERR)
     }
 

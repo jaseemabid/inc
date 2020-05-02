@@ -48,7 +48,7 @@ pub fn to(prog: &Expr) -> Option<i64> {
 
 // Immediate representation of numbers is required so often a helper is
 // useful.
-pub fn n(i: i64) -> i64 {
+pub const fn n(i: i64) -> i64 {
     (i << SHIFT) | NUM
 }
 
