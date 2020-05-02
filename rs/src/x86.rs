@@ -325,8 +325,8 @@ pub fn sub(r: Reference, v: Reference) -> Ins {
 }
 
 /// The base address of the heap is passed in RDI and we reserve reg R12 for it.
-pub fn init_heap() -> Ins {
-    Ins::from("mov r12, rdi        # Store heap index to R12")
+pub fn init_heap() -> ASM {
+    Ins::from("# Store heap index to R12") + Ins::from("mov r12, rdi")
 }
 
 /// Init is the target called from C.
@@ -511,12 +511,26 @@ impl fmt::Display for Reference {
 impl fmt::Display for ASM {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut ctx = String::new();
+        let mut comment: Option<&Ins> = None;
+
         for op in &self.0 {
+            // Comments must be appended to the next instruction
+            if op.0.starts_with('#') {
+                comment = Some(op);
+                continue;
+            }
+
             // Indent every line except labels by 4 spaces
             if op.0.ends_with(':') {
                 ctx.push_str(&format!("{}\n", &op.0));
             } else {
-                ctx.push_str(&format!("    {}\n", &op.0));
+                match comment {
+                    Some(s) => {
+                        ctx.push_str(&format!("    {:32}{}\n", &op.0, s.0));
+                        comment = None
+                    }
+                    None => ctx.push_str(&format!("    {}\n", &op.0)),
+                }
             }
         }
         write!(f, "{}", ctx)
