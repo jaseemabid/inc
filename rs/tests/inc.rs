@@ -551,8 +551,8 @@ mod io {
 
     #[test]
     fn fd() {
-        let k = r#"(open-input-file "/etc/hostname")"#;
-        test1(k, r#"['port "/etc/hostname" 4]"#);
+        let k = r#"(open-input-file "/etc/hosts")"#;
+        test1(k, r#"['port "/etc/hosts" 4]"#);
     }
 
     #[test]
