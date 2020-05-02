@@ -401,9 +401,9 @@ impl Add<Ins> for Ins {
 impl Add<ASM> for Ins {
     type Output = ASM;
 
-    fn add(self, asm: ASM) -> ASM {
+    fn add(self, mut asm: ASM) -> ASM {
         let mut v = vec![self];
-        v.append(&mut asm.0.clone());
+        v.append(&mut asm.0);
         ASM { 0: v }
     }
 }
