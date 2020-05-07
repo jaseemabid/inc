@@ -69,10 +69,28 @@ fn definition(i: &str) -> IResult<&str, Expr> {
     define_syntax(i) // | begin_syntax
 }
 
-/// ✗ (define <variable> <expression>) |
+/// ✓ (define <variable> <expression>) |
 /// ✓ (define (<variable> <variable>*) <body>) |
 /// ✗ (define (<variable> <variable>* . <variable>) <body>)
 fn define_syntax(i: &str) -> IResult<&str, Expr> {
+    alt((define_variable, define_lambda))(i)
+}
+
+fn define_variable(i: &str) -> IResult<&str, Expr> {
+    let (i, _) = tuple((open, tag("define"), space1))(i)?;
+    let (i, (name, _)) = tuple((identifier, space1))(i)?;
+    let (i, body) = expression(i)?;
+    let (i, _) = close(i)?;
+
+    let name = Some(Ident::from(name));
+
+    Ok((
+        i,
+        Expr::Lambda(Code { name, tail: false, formals: vec![], body: vec![body], free: vec![] }),
+    ))
+}
+
+fn define_lambda(i: &str) -> IResult<&str, Expr> {
     let (i, _) = tuple((open, tag("define"), space1))(i)?;
     let (i, mut params) = delimited(open, identifiers, close)(i)?;
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
@@ -366,17 +384,17 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     // OK consumes all of the input and succeeds
-    fn ok<T, E>(t: T) -> IResult<&'static str, T, E> {
+    const fn ok<T, E>(t: T) -> IResult<&'static str, T, E> {
         Ok(("", t))
     }
 
     // Partial consumes some of the input and succeeds
-    fn partial<T, E>(rest: &str, t: T) -> IResult<&str, T, E> {
+    const fn partial<T, E>(rest: &str, t: T) -> IResult<&str, T, E> {
         Ok((rest, t))
     }
 
     // Fail denotes a parser failing without consuming any of its input
-    fn fail<T>(i: &str) -> IResult<&str, T, (&str, nom::error::ErrorKind)> {
+    const fn fail<T>(i: &str) -> IResult<&str, T, (&str, nom::error::ErrorKind)> {
         Err(nom::Err::Error((i, nom::error::ErrorKind::Tag)))
     }
 
