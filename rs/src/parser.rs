@@ -617,6 +617,20 @@ mod tests {
         assert_eq!(exp, x);
         assert_eq!(ok(vec![exp]), program(prog));
 
+        let prog = "(define pi 42)";
+        let exp = Lambda(Code {
+            name: Some(Ident::new("pi")),
+            tail: false,
+            formals: vec![],
+            body: vec![42.into()],
+            free: vec![],
+        });
+
+        let (rest, x) = super::define_syntax(prog)?;
+        assert_eq!(rest, "");
+        assert_eq!(exp, x);
+        assert_eq!(ok(vec![exp]), program(prog));
+
         let prog = "(define (add a b) (+ a b))";
         let exp = Lambda(Code {
             name: Some(Ident::new("add")),
