@@ -653,6 +653,21 @@ mod tests {
             body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],
             free: vec![],
         });
+
+        let (rest, x) = super::define_syntax(prog)?;
+        assert_eq!(rest, "");
+        assert_eq!(exp, x);
+        assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(define (add x y . args) (reduce + 0 args))";
+        let exp = Lambda(Code {
+            name: Some(Ident::new("add")),
+            tail: false,
+            formals: vec!["x".into(), "y".into(), "args".into()],
+            body: vec![Expr::List(vec!["reduce".into(), "+".into(), 0.into(), "args".into()])],
+            free: vec![],
+        });
+
         assert_eq!(ok(vec![exp]), program(prog));
 
         Ok(())
