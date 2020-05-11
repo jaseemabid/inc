@@ -73,7 +73,7 @@ fn definition(i: &str) -> IResult<&str, Expr> {
 /// ✓ (define (<variable> <variable>*) <body>) |
 /// ✗ (define (<variable> <variable>* . <variable>) <body>)
 fn define_syntax(i: &str) -> IResult<&str, Expr> {
-    alt((define_variable, define_lambda))(i)
+    alt((define_variable, define_lambda, define_variadic_fn))(i)
 }
 
 fn define_variable(i: &str) -> IResult<&str, Expr> {
@@ -98,6 +98,20 @@ fn define_lambda(i: &str) -> IResult<&str, Expr> {
 
     let name = Some(Ident::from(params[0].clone()));
     let formals = params.split_off(1);
+
+    Ok((i, Expr::Lambda(Code { name, tail: false, formals, body, free: vec![] })))
+}
+
+fn define_variadic_fn(i: &str) -> IResult<&str, Expr> {
+    let (i, _) = tuple((open, tag("define"), space1))(i)?;
+    let (i, mut params) = delimited(open, identifiers, tag("."), identifiers, close)(i)?;
+    let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
+    let (i, _) = close(i)?;
+
+    let name = Some(Ident::from(params[0].clone()));
+    let formals = params.split_off(2);
+    
+    println!("{}, {}", name, formals)
 
     Ok((i, Expr::Lambda(Code { name, tail: false, formals, body, free: vec![] })))
 }
