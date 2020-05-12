@@ -105,7 +105,7 @@ fn define_lambda(i: &str) -> IResult<&str, Expr> {
 fn define_variadic_fn(i: &str) -> IResult<&str, Expr> {
     let (i, _) = tuple((open, tag("define"), space1))(i)?;
     let (i, mut params) = delimited(open, identifiers, tag("."))(i)?;
-    let (i, rest_param) = delimited(space0, identifier, close)(i)?;
+    let (i, rest_param) = delimited(space1, identifier, close)(i)?;
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
