@@ -371,7 +371,7 @@ fn string(i: &str) -> IResult<&str, String> {
 #[cfg(test)]
 fn list(i: &str) -> IResult<&str, Expr> {
     let (i, _) = tuple((char('('), space0))(i)?;
-    let (i, elems) = separated_list(space1, datum)(i)?;
+    let (i, elems) = separated_list1(space1, datum)(i)?;
     let (i, _) = tuple((space0, char(')')))(i)?;
 
     if elems.is_empty() {

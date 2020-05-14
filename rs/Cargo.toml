@@ -21,7 +21,7 @@ path = "src/main.rs"
 colored = "^1.9.0"
 getopts = "0.2"
 libc = "^0.2"
-nom = "^5.0"
+nom = "6.0.0-alpha1"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
