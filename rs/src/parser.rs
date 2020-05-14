@@ -69,6 +69,8 @@ fn definition(i: &str) -> IResult<&str, Expr> {
     define_syntax(i) // | begin_syntax
 }
 
+/// Expressions defined with a `define` keyword
+///
 /// ✓ (define <variable> <expression>) |
 /// ✓ (define (<variable> <variable>*) <body>) |
 /// ✓ (define (<variable> <variable>* . <variable>) <body>)
@@ -77,17 +79,15 @@ fn define_syntax(i: &str) -> IResult<&str, Expr> {
 }
 
 fn define_variable(i: &str) -> IResult<&str, Expr> {
-    let (i, _) = tuple((open, tag("define"), space1))(i)?;
-    let (i, (name, _)) = tuple((identifier, space1))(i)?;
-    let (i, body) = expression(i)?;
-    let (i, _) = close(i)?;
+    let (i, (_, _, _, name, _, body, _)) =
+        tuple((open, tag("define"), space1, identifier, space1, expression, close))(i)?;
 
     let name = Some(Ident::from(name));
+    // This isn't right since value here is not always a lambda. Fix with a
+    // better type.
+    let val = Code { name, tail: false, formals: vec![], body: vec![body], free: vec![] };
 
-    Ok((
-        i,
-        Expr::Lambda(Code { name, tail: false, formals: vec![], body: vec![body], free: vec![] }),
-    ))
+    Ok((i, Expr::Lambda(val)))
 }
 
 fn define_lambda(i: &str) -> IResult<&str, Expr> {
