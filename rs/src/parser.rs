@@ -589,86 +589,69 @@ mod tests {
 
     #[test]
     fn define_syntax() -> Result<(), nom::Err<(&'static str, nom::error::ErrorKind)>> {
-        let prog = "(define (id x) x)";
-        let exp = Lambda(Code {
-            name: Some(Ident::new("id")),
-            tail: false,
-            formals: vec!["x".into()],
-            body: vec![("x".into())],
-            free: vec![],
-        });
+        let table = [
+            (
+                "(define (id x) x)",
+                Lambda(Code {
+                    name: Some(Ident::new("id")),
+                    tail: false,
+                    formals: vec!["x".into()],
+                    body: vec![("x".into())],
+                    free: vec![],
+                }),
+            ),
+            (
+                "(define (pi) 42)",
+                Lambda(Code {
+                    name: Some(Ident::new("pi")),
+                    tail: false,
+                    formals: vec![],
+                    body: vec![42.into()],
+                    free: vec![],
+                }),
+            ),
+            (
+                "(define pi 42)",
+                Lambda(Code {
+                    name: Some(Ident::new("pi")),
+                    tail: false,
+                    formals: vec![],
+                    body: vec![42.into()],
+                    free: vec![],
+                }),
+            ),
+            (
+                "(define (add a b) (+ a b))",
+                Lambda(Code {
+                    name: Some(Ident::new("add")),
+                    tail: false,
+                    formals: vec!["a".into(), "b".into()],
+                    body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],
+                    free: vec![],
+                }),
+            ),
+            (
+                "(define (add x y . args) (reduce + 0 args))",
+                Lambda(Code {
+                    name: Some(Ident::new("add")),
+                    tail: false,
+                    formals: vec!["x".into(), "y".into(), "args".into()],
+                    body: vec![Expr::List(vec![
+                        "reduce".into(),
+                        "+".into(),
+                        0.into(),
+                        "args".into(),
+                    ])],
+                    free: vec![],
+                }),
+            ),
+        ];
 
-        let (rest, x) = super::define_syntax(prog)?;
-        assert_eq!(rest, "");
-        assert_eq!(exp, x);
-        assert_eq!(ok(vec![exp]), program(prog));
-
-        let prog = "(define (pi) 42)";
-        let exp = Lambda(Code {
-            name: Some(Ident::new("pi")),
-            tail: false,
-            formals: vec![],
-            body: vec![42.into()],
-            free: vec![],
-        });
-
-        let (rest, x) = super::define_syntax(prog)?;
-        assert_eq!(rest, "");
-        assert_eq!(exp, x);
-        assert_eq!(ok(vec![exp]), program(prog));
-
-        let prog = "(define pi 42)";
-        let exp = Lambda(Code {
-            name: Some(Ident::new("pi")),
-            tail: false,
-            formals: vec![],
-            body: vec![42.into()],
-            free: vec![],
-        });
-
-        let (rest, x) = super::define_syntax(prog)?;
-        assert_eq!(rest, "");
-        assert_eq!(exp, x);
-        assert_eq!(ok(vec![exp]), program(prog));
-
-        let prog = "(define pi 42)";
-        let exp = Lambda(Code {
-            name: Some(Ident::new("pi")),
-            tail: false,
-            formals: vec![],
-            body: vec![42.into()],
-            free: vec![],
-        });
-
-        let (rest, x) = super::define_syntax(prog)?;
-        assert_eq!(rest, "");
-        assert_eq!(exp, x);
-        assert_eq!(ok(vec![exp]), program(prog));
-
-        let prog = "(define (add a b) (+ a b))";
-        let exp = Lambda(Code {
-            name: Some(Ident::new("add")),
-            tail: false,
-            formals: vec!["a".into(), "b".into()],
-            body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],
-            free: vec![],
-        });
-
-        let (rest, x) = super::define_syntax(prog)?;
-        assert_eq!(rest, "");
-        assert_eq!(exp, x);
-        assert_eq!(ok(vec![exp]), program(prog));
-
-        let prog = "(define (add x y . args) (reduce + 0 args))";
-        let exp = Lambda(Code {
-            name: Some(Ident::new("add")),
-            tail: false,
-            formals: vec!["x".into(), "y".into(), "args".into()],
-            body: vec![Expr::List(vec!["reduce".into(), "+".into(), 0.into(), "args".into()])],
-            free: vec![],
-        });
-
-        assert_eq!(ok(vec![exp]), program(prog));
+        for (source, expectation) in table.iter() {
+            let (rest, x) = super::define_syntax(source)?;
+            assert_eq!(rest, "");
+            assert_eq!(expectation, &x);
+        }
 
         Ok(())
     }
