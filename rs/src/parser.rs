@@ -71,9 +71,9 @@ fn definition(i: &str) -> IResult<&str, Expr> {
 
 /// ✓ (define <variable> <expression>) |
 /// ✓ (define (<variable> <variable>*) <body>) |
-/// ✗ (define (<variable> <variable>* . <variable>) <body>)
+/// ✓ (define (<variable> <variable>* . <variable>) <body>)
 fn define_syntax(i: &str) -> IResult<&str, Expr> {
-    alt((define_variable, define_lambda))(i)
+    alt((define_variable, define_lambda, define_variadic_fn))(i)
 }
 
 fn define_variable(i: &str) -> IResult<&str, Expr> {
@@ -98,6 +98,20 @@ fn define_lambda(i: &str) -> IResult<&str, Expr> {
 
     let name = Some(Ident::from(params[0].clone()));
     let formals = params.split_off(1);
+
+    Ok((i, Expr::Lambda(Code { name, tail: false, formals, body, free: vec![] })))
+}
+
+fn define_variadic_fn(i: &str) -> IResult<&str, Expr> {
+    let (i, _) = tuple((open, tag("define"), space1))(i)?;
+    let (i, mut params) = delimited(open, identifiers, tag("."))(i)?;
+    let (i, rest_param) = delimited(space1, identifier, close)(i)?;
+    let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
+    let (i, _) = close(i)?;
+
+    let name = Some(Ident::from(params[0].clone()));
+    let mut formals = params.split_off(1);
+    formals.push(rest_param);
 
     Ok((i, Expr::Lambda(Code { name, tail: false, formals, body, free: vec![] })))
 }
@@ -617,6 +631,20 @@ mod tests {
         assert_eq!(exp, x);
         assert_eq!(ok(vec![exp]), program(prog));
 
+        let prog = "(define pi 42)";
+        let exp = Lambda(Code {
+            name: Some(Ident::new("pi")),
+            tail: false,
+            formals: vec![],
+            body: vec![42.into()],
+            free: vec![],
+        });
+
+        let (rest, x) = super::define_syntax(prog)?;
+        assert_eq!(rest, "");
+        assert_eq!(exp, x);
+        assert_eq!(ok(vec![exp]), program(prog));
+
         let prog = "(define (add a b) (+ a b))";
         let exp = Lambda(Code {
             name: Some(Ident::new("add")),
@@ -625,6 +653,21 @@ mod tests {
             body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],
             free: vec![],
         });
+
+        let (rest, x) = super::define_syntax(prog)?;
+        assert_eq!(rest, "");
+        assert_eq!(exp, x);
+        assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(define (add x y . args) (reduce + 0 args))";
+        let exp = Lambda(Code {
+            name: Some(Ident::new("add")),
+            tail: false,
+            formals: vec!["x".into(), "y".into(), "args".into()],
+            body: vec![Expr::List(vec!["reduce".into(), "+".into(), 0.into(), "args".into()])],
+            free: vec![],
+        });
+
         assert_eq!(ok(vec![exp]), program(prog));
 
         Ok(())
