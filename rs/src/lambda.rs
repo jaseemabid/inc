@@ -30,7 +30,7 @@
 //! SysV at some point.
 use crate::{
     compiler::{emit::eval, state::State},
-    core::{Code, Expr, Ident},
+    core::{Closure, Expr, Ident},
     x86::{self, Reference, Register::*, Relative, ASM, WORDSIZE},
 };
 
@@ -60,7 +60,7 @@ pub fn emit(s: &mut State, exprs: &[Expr]) -> ASM {
 /// etc. The function preamble effectively decrements the base pointer by `0x10`
 /// such that the such that the first argument can be accessed at `RBP - 8`, the
 /// next one at `RBP - 16` etc.
-fn emit1(s: &mut State, name: &Ident, code: &Code) -> ASM {
+fn emit1(s: &mut State, name: &Ident, code: &Closure) -> ASM {
     let mut asm = ASM(vec![]);
 
     asm += x86::func(&name.to_string());

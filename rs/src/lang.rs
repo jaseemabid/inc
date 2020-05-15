@@ -4,7 +4,7 @@
 use crate::{
     compiler::state::State,
     core::{
-        Code,
+        Closure,
         Expr::{self, *},
         Ident,
     },
@@ -61,9 +61,10 @@ fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
             alt: alt.map(|u| box mangle(env, *u)),
         },
 
-        Lambda(code) => {
-            Lambda(Code { body: code.body.into_iter().map(|b| mangle(env, b)).collect(), ..code })
-        }
+        Lambda(code) => Lambda(Closure {
+            body: code.body.into_iter().map(|b| mangle(env, b)).collect(),
+            ..code
+        }),
 
         // All literals and constants evaluate to itself
         v => v,
@@ -143,7 +144,7 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
                 .into_iter()
                 .filter_map(|(name, expr)| match expr {
                     Lambda(code) => {
-                        let code = Code { body: lift(s, code.body), ..code };
+                        let code = Closure { body: lift(s, code.body), ..code };
                         s.functions.insert(name.clone());
                         Some(Define { name, val: box Lambda(code) })
                     }
@@ -171,11 +172,11 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
         Define { name, val: box Lambda(code) } => {
             s.functions.insert(name.clone());
             let body = (code).body.into_iter().map(|b| lift1(s, b)).flatten().collect();
-            vec![Define { name, val: box Lambda(Code { body, ..code }) }]
+            vec![Define { name, val: box Lambda(Closure { body, ..code }) }]
         }
 
         // Am unnamed literal lambda must be in an inline calling position
-        // Lambda(Code { .. }) => unimplemented!("inline λ"),
+        // Lambda(Closure { .. }) => unimplemented!("inline λ"),
         e => vec![e],
     }
 }
@@ -242,7 +243,7 @@ fn shrink(es: Vec<Expr>) -> Expr {
 
 // Annotate tail calls with a marker
 pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
-    fn is_tail(name: &Ident, code: &Code) -> bool {
+    fn is_tail(name: &Ident, code: &Closure) -> bool {
         // Get the expression in tail call position
         let last = code.body.last().and_then(tail);
 
@@ -261,14 +262,14 @@ pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
         .map(|expr| match expr {
             Define { name, val: box Lambda(code) } => Define {
                 name: name.clone(),
-                val: box Lambda(Code { tail: is_tail(&name, &code), ..code }),
+                val: box Lambda(Closure { tail: is_tail(&name, &code), ..code }),
             },
             Let { bindings, body } => {
                 let bindings = bindings
                     .into_iter()
                     .map(|(name, value)| match value {
                         Lambda(code) => {
-                            (name.clone(), Lambda(Code { tail: is_tail(&name, &code), ..code }))
+                            (name.clone(), Lambda(Closure { tail: is_tail(&name, &code), ..code }))
                         }
                         _ => (name, value),
                     })
@@ -294,7 +295,7 @@ pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
 /// 4. All other expressions are not in tail position.
 fn tail(e: &Expr) -> Option<&Expr> {
     match e {
-        // Lambda(Code { body, .. }) => body.last().map(tail).flatten(),
+        // Lambda(Closure { body, .. }) => body.last().map(tail).flatten(),
         Let { body, .. } => body.last().and_then(tail),
         Cond { alt, .. } => {
             // What do I do with 2?
@@ -381,7 +382,7 @@ mod tests {
                 assert_eq!(bindings[0].0, Ident::new("f"));
                 assert_eq!(
                     bindings[0].1,
-                    Lambda(Code {
+                    Lambda(Closure {
                         formals: vec!["x".into()],
                         body: vec![List(vec![Expr::from("g"), Expr::from("x"), Expr::from("x")])],
                         ..Default::default()
@@ -391,7 +392,7 @@ mod tests {
                 assert_eq!(bindings[1].0, Ident::new("g"));
                 assert_eq!(
                     bindings[1].1,
-                    Lambda(Code {
+                    Lambda(Closure {
                         formals: vec!["x".to_string(), "y".to_string()],
                         body: vec![List(vec![Expr::from("+"), Expr::from("x"), Expr::from("y")])],
                         ..Default::default()
@@ -409,7 +410,7 @@ mod tests {
         let x = Let {
             bindings: vec![(
                 Ident::new("f"),
-                Lambda(Code {
+                Lambda(Closure {
                     formals: vec!["x".into()],
                     free: vec![],
                     body: vec![Cond {
@@ -449,7 +450,7 @@ mod tests {
             expr[0],
             Define {
                 name: Ident::from("id"),
-                val: box Lambda(Code {
+                val: box Lambda(Closure {
                     formals: vec!["x".into()],
                     body: vec!["x".into()],
                     ..Default::default()
@@ -475,7 +476,7 @@ mod tests {
             expr[0],
             Define {
                 name: Ident::from("even"),
-                val: box Lambda(Code {
+                val: box Lambda(Closure {
                     tail: false,
                     formals: vec!["x".into()],
                     free: vec![],
@@ -495,7 +496,7 @@ mod tests {
             expr[1],
             Define {
                 name: Ident::from("odd"),
-                val: box Lambda(Code {
+                val: box Lambda(Closure {
                     tail: false,
                     formals: vec!["x".into()],
                     free: vec![],

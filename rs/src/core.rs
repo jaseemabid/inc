@@ -34,7 +34,7 @@ pub enum Expr {
     // Variable definitions. Similar to let but could be at the top level
     Define { name: Ident, val: Box<Expr> },
     // Functions
-    Lambda(Code),
+    Lambda(Closure),
 }
 
 /// Ident is a refinement type for an identifier
@@ -68,9 +68,9 @@ impl Ident {
     }
 }
 
-/// Code is a refinement type for Expression specialized for lambdas
+/// Closure is a refinement type for Expression specialized for lambdas
 #[derive(Debug, PartialEq, Clone, Default)]
-pub struct Code {
+pub struct Closure {
     // Formal arguments to the function, filled in by the parser
     pub formals: Vec<String>,
     // Free variables, added post closure conversion
@@ -162,7 +162,7 @@ impl fmt::Display for Expr {
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
-            Expr::Lambda(Code { formals, body, tail, .. }) => {
+            Expr::Lambda(Closure { formals, body, tail, .. }) => {
                 if *tail {
                     write!(f, "(^λ^ (")?;
                 } else {
