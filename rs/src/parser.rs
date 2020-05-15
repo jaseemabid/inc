@@ -82,12 +82,7 @@ fn define_variable(i: &str) -> IResult<&str, Expr> {
     let (i, (_, _, _, name, _, body, _)) =
         tuple((open, tag("define"), space1, identifier, space1, expression, close))(i)?;
 
-    let name = Some(Ident::from(name));
-    // This isn't right since value here is not always a lambda. Fix with a
-    // better type.
-    let val = Code { name, tail: false, formals: vec![], body: vec![body], free: vec![] };
-
-    Ok((i, Expr::Lambda(val)))
+    Ok((i, Expr::Define { name: Ident::from(name), val: box body }))
 }
 
 fn define_lambda(i: &str) -> IResult<&str, Expr> {
@@ -96,10 +91,11 @@ fn define_lambda(i: &str) -> IResult<&str, Expr> {
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
-    let name = Some(Ident::from(params[0].clone()));
+    let name = Ident::from(params[0].to_string());
     let formals = params.split_off(1);
+    let body = Expr::Lambda(Code { tail: false, formals, body, free: vec![] });
 
-    Ok((i, Expr::Lambda(Code { name, tail: false, formals, body, free: vec![] })))
+    Ok((i, Expr::Define { name, val: box body }))
 }
 
 fn define_variadic_fn(i: &str) -> IResult<&str, Expr> {
@@ -109,11 +105,13 @@ fn define_variadic_fn(i: &str) -> IResult<&str, Expr> {
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
-    let name = Some(Ident::from(params[0].clone()));
+    let name = Ident::from(params[0].clone());
     let mut formals = params.split_off(1);
     formals.push(rest_param);
 
-    Ok((i, Expr::Lambda(Code { name, tail: false, formals, body, free: vec![] })))
+    let body = Expr::Lambda(Code { tail: false, formals, body, free: vec![] });
+
+    Ok((i, Expr::Define { name, val: box body }))
 }
 
 /// Core expressions
@@ -170,7 +168,7 @@ fn lambda_syntax(i: &str) -> IResult<&str, Expr> {
     let (i, (_, _, _, formals, _, body, _, _)) =
         tuple((open, tag("lambda"), space1, formals, space0, body, space0, close))(i)?;
 
-    Ok((i, Expr::Lambda(Code { name: None, tail: false, formals, body, free: vec![] })))
+    Ok((i, Expr::Lambda(Code { tail: false, formals, body, free: vec![] })))
 }
 
 /// `(if <expression> <expression> <expression>) | (if <expression> <expression>)`
@@ -592,58 +590,57 @@ mod tests {
         let table = [
             (
                 "(define (id x) x)",
-                Lambda(Code {
-                    name: Some(Ident::new("id")),
-                    tail: false,
-                    formals: vec!["x".into()],
-                    body: vec![("x".into())],
-                    free: vec![],
-                }),
+                Define {
+                    name: (Ident::new("id")),
+                    val: box Lambda(Code {
+                        tail: false,
+                        formals: vec!["x".into()],
+                        body: vec![("x".into())],
+                        free: vec![],
+                    }),
+                },
             ),
             (
                 "(define (pi) 42)",
-                Lambda(Code {
-                    name: Some(Ident::new("pi")),
-                    tail: false,
-                    formals: vec![],
-                    body: vec![42.into()],
-                    free: vec![],
-                }),
+                Define {
+                    name: (Ident::new("pi")),
+                    val: box Lambda(Code {
+                        tail: false,
+                        formals: vec![],
+                        body: vec![42.into()],
+                        free: vec![],
+                    }),
+                },
             ),
-            (
-                "(define pi 42)",
-                Lambda(Code {
-                    name: Some(Ident::new("pi")),
-                    tail: false,
-                    formals: vec![],
-                    body: vec![42.into()],
-                    free: vec![],
-                }),
-            ),
+            ("(define pi 42)", Define { name: (Ident::new("pi")), val: box Number(42) }),
             (
                 "(define (add a b) (+ a b))",
-                Lambda(Code {
-                    name: Some(Ident::new("add")),
-                    tail: false,
-                    formals: vec!["a".into(), "b".into()],
-                    body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],
-                    free: vec![],
-                }),
+                Define {
+                    name: (Ident::new("add")),
+                    val: box Lambda(Code {
+                        tail: false,
+                        formals: vec!["a".into(), "b".into()],
+                        body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],
+                        free: vec![],
+                    }),
+                },
             ),
             (
                 "(define (add x y . args) (reduce + 0 args))",
-                Lambda(Code {
-                    name: Some(Ident::new("add")),
-                    tail: false,
-                    formals: vec!["x".into(), "y".into(), "args".into()],
-                    body: vec![Expr::List(vec![
-                        "reduce".into(),
-                        "+".into(),
-                        0.into(),
-                        "args".into(),
-                    ])],
-                    free: vec![],
-                }),
+                Define {
+                    name: (Ident::new("add")),
+                    val: box Lambda(Code {
+                        tail: false,
+                        formals: vec!["x".into(), "y".into(), "args".into()],
+                        body: vec![Expr::List(vec![
+                            "reduce".into(),
+                            "+".into(),
+                            0.into(),
+                            "args".into(),
+                        ])],
+                        free: vec![],
+                    }),
+                },
             ),
         ];
 
@@ -659,19 +656,13 @@ mod tests {
     #[test]
     fn lambda_syntax() {
         let prog = "(lambda () 1)";
-        let exp = Lambda(Code {
-            name: None,
-            tail: false,
-            formals: vec![],
-            body: vec![Number(1)],
-            free: vec![],
-        });
+        let exp =
+            Lambda(Code { tail: false, formals: vec![], body: vec![Number(1)], free: vec![] });
 
         assert_eq!(ok(vec![exp]), program(prog));
 
         let prog = "(lambda (a b ) a)";
         let exp = Lambda(Code {
-            name: None,
             tail: false,
             formals: vec!["a".into(), "b".into()],
             free: vec![],
@@ -683,7 +674,6 @@ mod tests {
 
         let prog = "(lambda (a b) (+ b a))";
         let exp = Lambda(Code {
-            name: None,
             tail: false,
             free: vec![],
             formals: vec!["a".into(), "b".into()],
@@ -694,7 +684,6 @@ mod tests {
 
         let prog = "(lambda a a)";
         let exp = Lambda(Code {
-            name: None,
             tail: false,
             formals: vec!["a".into()],
             free: vec![],
@@ -705,7 +694,6 @@ mod tests {
 
         let prog = "(lambda (x) (if #t 1 2))";
         let exp = Lambda(Code {
-            name: None,
             tail: false,
             formals: vec!["x".into()],
             free: vec![],
@@ -716,7 +704,6 @@ mod tests {
 
         let prog = "(lambda (x) (if (zero? x) 1 (* x (f (dec x)))))";
         let exp = Lambda(Code {
-            name: None,
             tail: false,
             formals: vec!["x".into()],
             free: vec![],

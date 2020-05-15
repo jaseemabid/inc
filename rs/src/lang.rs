@@ -34,10 +34,16 @@ pub fn lift(s: &mut State, prog: Vec<Expr>) -> Vec<Expr> {
 
 /// Rename/mangle all references to unique names
 ///
+/// This is a fairly complicated thing to get right and being able to reuse a
+/// well tested existing implementation would be great. See [RFC 2603] to learn
+/// how rustc does this.
+///
 // A sub expression in let binding is evaluated with the complete environment
 // including the one being defined only if the subexpresison captures the
 // closure with another let or lambda, otherwise evaluate with only the rest of
 // the bindings.
+//
+// [RFC 2603]: https://github.com/rust-lang/rfcs/blob/master/text/2603-rust-symbol-name-mangling-v0.md
 fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
     match prog {
         Identifier(ident) => Identifier(match env.get(ident.name.as_str()) {
@@ -85,11 +91,7 @@ fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Exp
 
                 let value = match value {
                     Let { .. } => mangle(&all, value.clone()),
-                    Lambda(c) => {
-                        let mut c = c.clone();
-                        c.name = Some(current.clone());
-                        mangle(&all, Lambda(c))
-                    }
+                    Lambda(c) => mangle(&all, Lambda(c.clone())),
                     _ => mangle(&rest, value.clone()),
                 };
 
@@ -139,11 +141,11 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
 
             let mut export: Vec<Expr> = bindings
                 .into_iter()
-                .filter_map(|(ident, expr)| match expr {
+                .filter_map(|(name, expr)| match expr {
                     Lambda(code) => {
                         let code = Code { body: lift(s, code.body), ..code };
-                        s.functions.insert(ident);
-                        Some(Lambda(code))
+                        s.functions.insert(name.clone());
+                        Some(Define { name, val: box Lambda(code) })
                     }
                     _ => None,
                 })
@@ -166,15 +168,14 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
         }],
 
         // Lift named code blocks to top level immediately, since names are manged by now.
-        Lambda(code @ Code { name: Some(_), .. }) => {
-            s.functions.insert(code.name.as_ref().unwrap().clone());
-            let body = code.body.into_iter().map(|b| lift1(s, b)).flatten().collect();
-            vec![Lambda(Code { body, ..code })]
+        Define { name, val: box Lambda(code) } => {
+            s.functions.insert(name.clone());
+            let body = (code).body.into_iter().map(|b| lift1(s, b)).flatten().collect();
+            vec![Define { name, val: box Lambda(Code { body, ..code }) }]
         }
 
         // Am unnamed literal lambda must be in an inline calling position
-        Lambda(Code { name: None, .. }) => unimplemented!("inline λ"),
-
+        // Lambda(Code { .. }) => unimplemented!("inline λ"),
         e => vec![e],
     }
 }
@@ -241,14 +242,14 @@ fn shrink(es: Vec<Expr>) -> Expr {
 
 // Annotate tail calls with a marker
 pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
-    fn is_tail(code: &Code) -> bool {
+    fn is_tail(name: &Ident, code: &Code) -> bool {
         // Get the expression in tail call position
         let last = code.body.last().and_then(tail);
 
         // Check if the tail call is a list and the first elem is an identifier
         match last {
             Some(List(l)) => match l.first() {
-                Some(Identifier(id)) => Some(id) == code.name.as_ref(),
+                Some(Identifier(id)) => id == name,
                 _ => false,
             },
             _ => false,
@@ -258,11 +259,25 @@ pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
     exprs
         .into_iter()
         .map(|expr| match expr {
-            Lambda(mut code) => {
-                code.tail = is_tail(&code);
-                Lambda(code)
+            Define { name, val: box Lambda(code) } => Define {
+                name: name.clone(),
+                val: box Lambda(Code { tail: is_tail(&name, &code), ..code }),
+            },
+            Let { bindings, body } => {
+                let bindings = bindings
+                    .into_iter()
+                    .map(|(name, value)| match value {
+                        Lambda(code) => {
+                            (name.clone(), Lambda(Code { tail: is_tail(&name, &code), ..code }))
+                        }
+                        _ => (name, value),
+                    })
+                    .collect();
+
+                Let { bindings, body }
             }
-            _ => expr,
+
+            e => e,
         })
         .collect()
 }
@@ -367,7 +382,6 @@ mod tests {
                 assert_eq!(
                     bindings[0].1,
                     Lambda(Code {
-                        name: Some(Ident::new("f")),
                         formals: vec!["x".into()],
                         body: vec![List(vec![Expr::from("g"), Expr::from("x"), Expr::from("x")])],
                         ..Default::default()
@@ -378,7 +392,6 @@ mod tests {
                 assert_eq!(
                     bindings[1].1,
                     Lambda(Code {
-                        name: Some(Ident::new("g")),
                         formals: vec!["x".to_string(), "y".to_string()],
                         body: vec![List(vec![Expr::from("+"), Expr::from("x"), Expr::from("y")])],
                         ..Default::default()
@@ -397,7 +410,6 @@ mod tests {
             bindings: vec![(
                 Ident::new("f"),
                 Lambda(Code {
-                    name: Some(Ident::new("f")),
                     formals: vec!["x".into()],
                     free: vec![],
                     body: vec![Cond {
@@ -435,11 +447,14 @@ mod tests {
 
         assert_eq!(
             expr[0],
-            Lambda(Code {
-                formals: vec!["x".into()],
-                body: vec!["x".into()],
-                ..Default::default()
-            })
+            Define {
+                name: Ident::from("id"),
+                val: box Lambda(Code {
+                    formals: vec!["x".into()],
+                    body: vec!["x".into()],
+                    ..Default::default()
+                })
+            }
         );
 
         assert_eq!(
@@ -450,40 +465,50 @@ mod tests {
 
     #[test]
     fn lift_recursive() {
-        let prog = r"(let ((e (lambda (x) (if (zero? x) #t (o (dec x)))))
-                           (o (lambda (x) (if (zero? x) #f (e (dec x))))))
+        let prog = r"(let ((even (lambda (x) (if (zero? x) #t (odd (dec x)))))
+                           (odd  (lambda (x) (if (zero? x) #f (even (dec x))))))
                        (e 25)))";
 
         let expr = lift1(&mut Default::default(), parse1(prog));
 
         assert_eq!(
             expr[0],
-            Lambda(Code {
-                name: None,
-                tail: false,
-                formals: vec!["x".into()],
-                free: vec![],
-                body: vec![Cond {
-                    pred: box List(vec!["zero?".into(), "x".into()]),
-                    then: box Boolean(true),
-                    alt: Some(box List(vec!["o".into(), List(vec!["dec".into(), "x".into()])]))
-                }]
-            })
+            Define {
+                name: Ident::from("even"),
+                val: box Lambda(Code {
+                    tail: false,
+                    formals: vec!["x".into()],
+                    free: vec![],
+                    body: vec![Cond {
+                        pred: box List(vec!["zero?".into(), "x".into()]),
+                        then: box Boolean(true),
+                        alt: Some(box List(vec![
+                            "odd".into(),
+                            List(vec!["dec".into(), "x".into()])
+                        ]))
+                    }]
+                })
+            }
         );
 
         assert_eq!(
             expr[1],
-            Lambda(Code {
-                name: None,
-                tail: false,
-                formals: vec!["x".into()],
-                free: vec![],
-                body: vec![Cond {
-                    pred: box List(vec!["zero?".into(), "x".into()]),
-                    then: box Boolean(false),
-                    alt: Some(box List(vec!["e".into(), List(vec!["dec".into(), "x".into()])]))
-                }]
-            })
+            Define {
+                name: Ident::from("odd"),
+                val: box Lambda(Code {
+                    tail: false,
+                    formals: vec!["x".into()],
+                    free: vec![],
+                    body: vec![Cond {
+                        pred: box List(vec!["zero?".into(), "x".into()]),
+                        then: box Boolean(false),
+                        alt: Some(box List(vec![
+                            "even".into(),
+                            List(vec!["dec".into(), "x".into()])
+                        ]))
+                    }]
+                })
+            }
         );
 
         assert_eq!(
@@ -504,20 +529,16 @@ mod tests {
         let expr = mangle(&HashMap::<&str, i64>::new(), expr);
         let exprs = lift1(&mut Default::default(), expr);
 
-        let code = match &exprs[0] {
-            Lambda(c) => c,
+        match &exprs[0] {
+            Define { name: _, val: box Lambda(code) } => assert_eq!(code.tail, false),
             _ => panic!(),
         };
-
-        assert_eq!(code.tail, false);
 
         let exprs = tco(exprs);
 
-        let code = match &exprs[0] {
-            Lambda(c) => c,
+        match &exprs[0] {
+            Define { name: _, val: box Lambda(code) } => assert_eq!(code.tail, true),
             _ => panic!(),
-        };
-
-        assert_eq!(code.tail, true);
+        }
     }
 }

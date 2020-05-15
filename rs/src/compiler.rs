@@ -279,6 +279,8 @@ pub mod emit {
 
             Lambda(_) => ASM(vec![]),
 
+            Define { .. } => ASM(vec![]),
+
             _ => match immediate::to(&prog) {
                 Some(c) => x86::mov(RAX.into(), c.into()).into(),
                 None => panic!("Unknown expression: `{}`", prog),

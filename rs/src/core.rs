@@ -31,6 +31,8 @@ pub enum Expr {
     Cond { pred: Box<Expr>, then: Box<Expr>, alt: Option<Box<Expr>> },
     // Variable bindings
     Let { bindings: Vec<(Ident, Expr)>, body: Vec<Expr> },
+    // Variable definitions. Similar to let but could be at the top level
+    Define { name: Ident, val: Box<Expr> },
     // Functions
     Lambda(Code),
 }
@@ -69,8 +71,6 @@ impl Ident {
 /// Code is a refinement type for Expression specialized for lambdas
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Code {
-    // A rose by any other name would smell as sweet
-    pub name: Option<Ident>,
     // Formal arguments to the function, filled in by the parser
     pub formals: Vec<String>,
     // Free variables, added post closure conversion
@@ -87,7 +87,7 @@ impl Expr {
         match self {
             Nil | Number(..) | Boolean(..) | Char(..) => true,
             Str(..) | Identifier(..) | Symbol(..) | Vector(..) => true,
-            List(..) | Cond { .. } | Let { .. } | Lambda { .. } => false,
+            List(..) | Cond { .. } | Let { .. } | Lambda { .. } | Define { .. } => false,
         }
     }
 }
@@ -174,6 +174,7 @@ impl fmt::Display for Expr {
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
+            Expr::Define { name, val } => write!(f, "(define {} {})", name, val),
         }
     }
 }

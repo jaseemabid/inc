@@ -39,8 +39,8 @@ pub fn emit(s: &mut State, exprs: &[Expr]) -> ASM {
     let mut asm = ASM(vec![]);
 
     for expr in exprs.iter() {
-        if let Expr::Lambda(c) = expr {
-            asm += emit1(s, c)
+        if let Expr::Define { name, val: box Expr::Lambda(c) } = expr {
+            asm += emit1(s, &name, c)
         }
     }
     asm
@@ -60,13 +60,8 @@ pub fn emit(s: &mut State, exprs: &[Expr]) -> ASM {
 /// etc. The function preamble effectively decrements the base pointer by `0x10`
 /// such that the such that the first argument can be accessed at `RBP - 8`, the
 /// next one at `RBP - 16` etc.
-fn emit1(s: &mut State, code: &Code) -> ASM {
+fn emit1(s: &mut State, name: &Ident, code: &Code) -> ASM {
     let mut asm = ASM(vec![]);
-
-    let name = match &code.name {
-        None => panic!("Generating code for unnamed function, something went wrong in mangling"),
-        Some(name) => name,
-    };
 
     asm += x86::func(&name.to_string());
 
