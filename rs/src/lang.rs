@@ -8,7 +8,15 @@ use crate::{
 
 use std::collections::HashMap;
 
-/// Rename/mangle all references to unique names
+/// Rename/mangle all references to unique names.
+///
+/// This is a fairly complicated thing to get right and being able to reuse a
+/// well tested existing implementation would be great. See [RFC 2603], its
+/// [discussion] and [tracking issue] to learn how rustc does this.
+///
+/// [RFC 2603]: https://github.com/rust-lang/rfcs/blob/master/text/2603-rust-symbol-name-mangling-v0.md
+/// [discussion]: https://github.com/rust-lang/rfcs/pull/2603
+/// [tracking issue]: https://github.com/rust-lang/rust/issues/60705
 pub fn rename(prog: Vec<Expr>) -> Vec<Expr> {
     // TODO: This isn't right, same state should be used for all sub expressions.
     // Test for 2 different functions with the same name.
@@ -28,18 +36,6 @@ pub fn lift(s: &mut State, prog: Vec<Expr>) -> Vec<Expr> {
     prog.into_iter().flat_map(|expr| lift1(s, expr)).collect()
 }
 
-/// Rename/mangle all references to unique names
-///
-/// This is a fairly complicated thing to get right and being able to reuse a
-/// well tested existing implementation would be great. See [RFC 2603] to learn
-/// how rustc does this.
-///
-// A sub expression in let binding is evaluated with the complete environment
-// including the one being defined only if the subexpresison captures the
-// closure with another let or lambda, otherwise evaluate with only the rest of
-// the bindings.
-//
-// [RFC 2603]: https://github.com/rust-lang/rfcs/blob/master/text/2603-rust-symbol-name-mangling-v0.md
 fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
     match prog {
         Literal(Identifier(ident)) => Literal(Identifier(match env.get(ident.name.as_str()) {
@@ -74,6 +70,10 @@ fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Exp
         all.entry(ident.name.as_str()).and_modify(|e| *e += 1).or_insert(0);
     }
 
+    // A sub expression in let binding is evaluated with the complete
+    // environment including the one being defined only if the subexpresison
+    // captures the closure with another let or lambda, otherwise evaluate with
+    // only the rest of the bindings.
     Let {
         bindings: bindings
             .iter()
