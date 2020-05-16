@@ -11,7 +11,10 @@
 //!
 //! See the paper for details. See tests for examples.
 
-use crate::core::*;
+use crate::core::{
+    Expr::{self, *},
+    Literal::*,
+};
 
 pub const NUM: i64 = 0;
 pub const BOOL: i64 = 1;
@@ -31,17 +34,17 @@ pub const TRUE: i64 = (1 << SHIFT) | BOOL;
 /// Immediate representation of an expression.
 pub fn to(prog: &Expr) -> Option<i64> {
     match prog {
-        Expr::Number(i) => Some((i << SHIFT) | NUM),
-        Expr::Boolean(true) => Some(TRUE),
-        Expr::Boolean(false) => Some(FALSE),
+        Literal(Number(i)) => Some((i << SHIFT) | NUM),
+        Literal(Boolean(true)) => Some(TRUE),
+        Literal(Boolean(false)) => Some(FALSE),
         // An ASCII char is a single byte, so most of these shifts should be
         // OK. This is going to go wrong pretty badly with Unicode.
-        Expr::Char(c) => {
+        Literal(Char(c)) => {
             // Expand u8 to i64 before shifting right, this will easily
             // overflow and give bogus results otherwise. Unit testing FTW!
             Some((i64::from(*c) << SHIFT) | CHAR)
         }
-        Expr::Nil => Some(NIL),
+        Literal(Nil) => Some(NIL),
         _ => None,
     }
 }
@@ -59,15 +62,12 @@ mod tests {
 
     #[test]
     fn numbers() {
-        assert_eq!(to(&0.into()), Some(0));
-        assert_eq!(to(&1.into()), Some(8));
-
-        assert_eq!(Expr::Number(0), 0.into());
-        assert_eq!(Expr::Number(1), 1.into());
+        assert_eq!(to(&Expr::from(0)), Some(0));
+        assert_eq!(to(&Expr::from(1)), Some(8));
     }
 
     #[test]
     fn chars() {
-        assert_eq!(to(&('A').into()), Some((65 << SHIFT) + CHAR));
+        assert_eq!(to(&Literal(Char(b'A'))), Some((65 << SHIFT) + CHAR))
     }
 }

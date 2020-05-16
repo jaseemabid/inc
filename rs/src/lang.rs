@@ -3,11 +3,7 @@
 //! Home for renaming, lifting, type checks and everything else.
 use crate::{
     compiler::state::State,
-    core::{
-        Closure,
-        Expr::{self, *},
-        Ident,
-    },
+    core::{Expr::*, Literal::*, *},
 };
 
 use std::collections::HashMap;
@@ -46,10 +42,10 @@ pub fn lift(s: &mut State, prog: Vec<Expr>) -> Vec<Expr> {
 // [RFC 2603]: https://github.com/rust-lang/rfcs/blob/master/text/2603-rust-symbol-name-mangling-v0.md
 fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
     match prog {
-        Identifier(ident) => Identifier(match env.get(ident.name.as_str()) {
+        Literal(Identifier(ident)) => Literal(Identifier(match env.get(ident.name.as_str()) {
             Some(n) => Ident { name: ident.name.clone(), index: *n },
             None => ident,
-        }),
+        })),
 
         Let { bindings, body } => mangle1(env, bindings, body),
 
@@ -116,18 +112,18 @@ fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Exp
 // cases, but lift should be able to assume so.
 fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
     match prog {
-        Str(reference) => {
+        Literal(Str(reference)) => {
             if !s.strings.contains_key(&reference) {
                 s.strings.insert(reference.clone(), s.strings.len());
             }
-            vec![Str(reference)]
+            vec![Literal(Str(reference))]
         }
 
-        Symbol(reference) => {
+        Literal(Symbol(reference)) => {
             if !s.symbols.contains_key(&reference) {
                 s.symbols.insert(reference.clone(), s.symbols.len());
             }
-            vec![Symbol(reference)]
+            vec![Literal(Symbol(reference))]
         }
 
         Let { bindings, body } => {
@@ -216,7 +212,7 @@ fn anf1(prog: Expr) -> Expr {
                         if e.anf() {
                             e.clone()
                         } else {
-                            Identifier(Ident::new(format!("_{}", i)))
+                            Literal(Identifier(Ident::new(format!("_{}", i))))
                         }
                     })
                     .collect();
@@ -235,7 +231,7 @@ fn anf1(prog: Expr) -> Expr {
 // TODO: Replace with `(begin ...)`, list really isn't the same thing
 fn shrink(es: Vec<Expr>) -> Expr {
     match es.len() {
-        0 => Nil,
+        0 => Literal(Nil),
         1 => es[0].clone(),
         _ => List(es),
     }
@@ -250,7 +246,7 @@ pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
         // Check if the tail call is a list and the first elem is an identifier
         match last {
             Some(List(l)) => match l.first() {
-                Some(Identifier(id)) => id == name,
+                Some(Literal(Identifier(id))) => id == name,
                 _ => false,
             },
             _ => false,
@@ -384,7 +380,11 @@ mod tests {
                     bindings[0].1,
                     Lambda(Closure {
                         formals: vec!["x".into()],
-                        body: vec![List(vec![Expr::from("g"), Expr::from("x"), Expr::from("x")])],
+                        body: vec![List(vec![
+                            Expr::ident("g"),
+                            Expr::ident("x"),
+                            Expr::ident("x")
+                        ])],
                         ..Default::default()
                     })
                 );
@@ -394,12 +394,16 @@ mod tests {
                     bindings[1].1,
                     Lambda(Closure {
                         formals: vec!["x".to_string(), "y".to_string()],
-                        body: vec![List(vec![Expr::from("+"), Expr::from("x"), Expr::from("y")])],
+                        body: vec![List(vec![
+                            Expr::ident("+"),
+                            Expr::ident("x"),
+                            Expr::ident("y")
+                        ])],
                         ..Default::default()
                     })
                 );
 
-                assert_eq!(body, vec![List(vec![Expr::from("f"), Number(12)])]);
+                assert_eq!(body, vec![List(vec![Expr::ident("f"), Expr::from(12)])]);
             }
             _ => panic!(),
         }
@@ -414,21 +418,21 @@ mod tests {
                     formals: vec!["x".into()],
                     free: vec![],
                     body: vec![Cond {
-                        pred: box List(vec![Expr::from("zero?"), Expr::from("x")]),
-                        then: box Number(1),
+                        pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
+                        then: box Expr::from(1),
                         alt: Some(box List(vec![
-                            Expr::from("*"),
-                            Expr::from("x"),
+                            Expr::ident("*"),
+                            Expr::ident("x"),
                             List(vec![
-                                Expr::from("f"),
-                                List(vec![Expr::from("dec"), Expr::from("x")]),
+                                Expr::ident("f"),
+                                List(vec![Expr::ident("dec"), Expr::ident("x")]),
                             ]),
                         ])),
                     }],
                     tail: false,
                 }),
             )],
-            body: vec![List(vec![Expr::from("f"), Number(5)])],
+            body: vec![List(vec![Expr::ident("f"), Expr::from(5)])],
         };
 
         let y = parse1(
@@ -452,7 +456,7 @@ mod tests {
                 name: Ident::from("id"),
                 val: box Lambda(Closure {
                     formals: vec!["x".into()],
-                    body: vec!["x".into()],
+                    body: vec![Expr::ident("x")],
                     ..Default::default()
                 })
             }
@@ -460,7 +464,7 @@ mod tests {
 
         assert_eq!(
             expr[1],
-            Let { bindings: vec![], body: vec![List(vec!["id".into(), Number(42)])] }
+            Let { bindings: vec![], body: vec![List(vec![Expr::ident("id"), Expr::from(42)])] }
         );
     }
 
@@ -481,11 +485,11 @@ mod tests {
                     formals: vec!["x".into()],
                     free: vec![],
                     body: vec![Cond {
-                        pred: box List(vec!["zero?".into(), "x".into()]),
-                        then: box Boolean(true),
+                        pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
+                        then: box Expr::from(true),
                         alt: Some(box List(vec![
-                            "odd".into(),
-                            List(vec!["dec".into(), "x".into()])
+                            Expr::ident("odd"),
+                            List(vec![Expr::ident("dec"), Expr::ident("x")])
                         ]))
                     }]
                 })
@@ -501,11 +505,11 @@ mod tests {
                     formals: vec!["x".into()],
                     free: vec![],
                     body: vec![Cond {
-                        pred: box List(vec!["zero?".into(), "x".into()]),
-                        then: box Boolean(false),
+                        pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
+                        then: box Expr::from(false),
                         alt: Some(box List(vec![
-                            "even".into(),
-                            List(vec!["dec".into(), "x".into()])
+                            Expr::ident("even"),
+                            List(vec![Expr::ident("dec"), Expr::ident("x")])
                         ]))
                     }]
                 })
@@ -514,7 +518,7 @@ mod tests {
 
         assert_eq!(
             expr[2],
-            Let { bindings: vec![], body: vec![List(vec!["e".into(), Number(25)])] }
+            Let { bindings: vec![], body: vec![List(vec![Expr::ident("e"), Expr::from(25)])] }
         );
     }
 

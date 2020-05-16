@@ -16,7 +16,7 @@ use crate::{
         emit::{eval, mask},
         state::State,
     },
-    core::*,
+    core::{Literal::*, *},
     immediate, strings,
     x86::{self, Reference::*, Register::*, *},
 };
@@ -42,7 +42,7 @@ pub fn call(s: &mut State, fname: &str, args: &[Expr]) -> Option<ASM> {
         ("dec", [arg]) => Some(dec(s, arg)),
         ("fixnum?", [arg]) => Some(fixnump(s, arg)),
         ("inc", [arg]) => Some(inc(s, arg)),
-        ("make-string", [Expr::Number(n)]) => Some(strings::make(s, *n)),
+        ("make-string", [Expr::Literal(Number(n))]) => Some(strings::make(s, *n)),
         ("not", [arg]) => Some(not(s, arg)),
         ("null?", [arg]) => Some(nullp(s, arg)),
         ("pair?", [arg]) => Some(pairp(s, arg)),

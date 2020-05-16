@@ -174,6 +174,7 @@ pub mod emit {
         core::{
             Expr::{self, *},
             Ident,
+            Literal::*,
         },
         x86::{self, Ins, Reference, Register::*, Relative, ASM},
         *,
@@ -222,7 +223,7 @@ pub mod emit {
 
         // A conditional without an explicit alternate should evaluate to '()
         let t = match alt {
-            None => &Expr::Nil,
+            None => &Literal(Nil),
             Some(t) => t,
         };
 
@@ -248,22 +249,22 @@ pub mod emit {
     #[allow(clippy::redundant_pattern)]
     pub fn eval(s: &mut State, prog: &Expr) -> ASM {
         match prog {
-            Identifier(i) => match s.get(&i) {
+            Literal(Identifier(i)) => match s.get(&i) {
                 Some(index) => x86::mov(RAX.into(), index.clone()).into(),
                 None => panic!("Undefined variable {}", i.name),
             },
 
             // Find the symbol index and return and reference in RAX
-            Str(data) => strings::eval(&s, &data),
+            Literal(Str(data)) => strings::eval(&s, &data),
 
-            Symbol(data) => symbols::eval(&s, &data),
+            Literal(Symbol(data)) => symbols::eval(&s, &data),
 
             Let { bindings, body } => vars(s, bindings, body),
 
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
-                [Identifier(i @ Ident { name, .. }), args @ ..] => {
+                [Literal(Identifier(i @ Ident { name, .. })), args @ ..] => {
                     if s.functions.contains(&i) {
                         lambda::call(s, &i, &args)
                     } else if let Some(x) = primitives::call(s, &name, args) {

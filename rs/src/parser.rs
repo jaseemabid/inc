@@ -11,7 +11,7 @@
 //!
 //! [grammar]: http://www.scheme.com/tspl2d/grammar.html
 //! [lisper]: https://github.com/jaseemabid/lisper/blob/master/src/Lisper/Parser.hs
-use super::core::*;
+use super::core::{Literal::*, *};
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag},
@@ -142,7 +142,15 @@ fn define_variadic_fn(i: &str) -> IResult<&str, Expr> {
 /// <application> → (<expression> <expression>*)
 /// ```
 fn expression(i: &str) -> IResult<&str, Expr> {
-    alt((constant, variable, quote, lambda_syntax, if_syntax, let_syntax, application))(i)
+    alt((
+        (map(constant, Expr::Literal)),
+        variable,
+        quote,
+        lambda_syntax,
+        if_syntax,
+        let_syntax,
+        application,
+    ))(i)
 }
 
 /// `(let-syntax (<syntax binding>*) <expression>+)`
@@ -190,7 +198,7 @@ fn if_syntax(i: &str) -> IResult<&str, Expr> {
 
 /// variable is an identifier
 fn variable(i: &str) -> IResult<&str, Expr> {
-    map(identifier, |name| Expr::Identifier(Ident::from(name)))(i)
+    map(identifier, Expr::ident)(i)
 }
 
 /// `<formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)`
@@ -213,17 +221,17 @@ fn body(i: &str) -> IResult<&str, Vec<Expr>> {
 /// (quote <datum>) | '<datum>
 // Note: This parser only handles simple quoted symbols for now
 fn quote(i: &str) -> IResult<&str, Expr> {
-    map(tuple((tag("\'"), identifier)), |(_, i)| Expr::Symbol(i))(i)
+    map(tuple((tag("\'"), identifier)), |(_, i)| Expr::symbol(i))(i)
 }
 
 /// `<constant> → <boolean> | <number> | <character> | <string>`
-fn constant(i: &str) -> IResult<&str, Expr> {
+fn constant(i: &str) -> IResult<&str, Literal> {
     alt((
-        (map(tag("()"), |_| Expr::Nil)),
-        (map(ascii, Expr::Char)),
-        (map(boolean, Expr::Boolean)),
-        (map(number, Expr::Number)),
-        (map(string, Expr::Str)),
+        (map(tag("()"), |_| Nil)),
+        (map(ascii, Char)),
+        (map(boolean, Boolean)),
+        (map(number, Number)),
+        (map(string, Str)),
     ))(i)
 }
 
@@ -317,12 +325,12 @@ fn digit(i: &str) -> IResult<&str, char> {
 #[cfg(test)]
 fn datum(i: &str) -> IResult<&str, Expr> {
     alt((
-        (map(tag("()"), |_| Expr::Nil)),
-        (map(boolean, Expr::Boolean)),
-        (map(ascii, Expr::Char)),
-        (map(number, Expr::Number)),
-        (map(identifier, |name| Expr::Identifier(Ident::from(name)))),
-        (map(string, Expr::Str)),
+        (map(tag("()"), |_| Expr::Literal(Nil))),
+        (map(boolean, Expr::from)),
+        (map(ascii, |c| Expr::from(c as char))),
+        (map(number, Expr::from)),
+        (map(identifier, Expr::ident)),
+        (map(string, Expr::string)),
         list,
     ))(i)
 }
@@ -373,7 +381,7 @@ fn list(i: &str) -> IResult<&str, Expr> {
     let (i, _) = tuple((space0, char(')')))(i)?;
 
     if elems.is_empty() {
-        Ok((i, Expr::Nil))
+        Ok((i, Expr::Literal(Nil)))
     } else {
         Ok((i, Expr::List(elems)))
     }
@@ -450,7 +458,10 @@ mod tests {
         assert_eq!(partial("'woo", String::from("a")), identifier("a'woo"));
 
         // Internal hack, allow shadowing with .
-        assert_eq!(ok(Identifier(Ident { name: String::from("foo"), index: 4 })), datum("foo.4"));
+        assert_eq!(
+            ok(Literal(Identifier(Ident { name: String::from("foo"), index: 4 }))),
+            datum("foo.4")
+        );
     }
 
     // #[test]
@@ -460,32 +471,37 @@ mod tests {
 
     #[test]
     fn data() {
-        assert_eq!(ok(Nil), datum("()"));
-        assert_eq!(ok("one".into()), datum("one"));
-        assert_eq!(ok(42.into()), datum("42"));
+        assert_eq!(ok(Expr::Literal(Nil)), datum("()"));
+        assert_eq!(ok(Expr::ident("one")), datum("one"));
+        assert_eq!(ok(42.into()), datum("42"))
     }
 
     #[test]
     fn strings() {
-        assert_eq!(ok(Str("hello world".into())), datum("\"hello world\""));
-        assert_eq!(ok(Str("മലയാളം".into())), datum("\"മലയാളം\""));
-
-        assert_eq!(ok(Str("Unicode 😱 ⌘".into())), datum("\"Unicode 😱 ⌘\""));
-
-        assert_eq!(ok(Str("".into())), datum("\"\""));
+        assert_eq!(ok(Expr::string("hello world")), datum("\"hello world\""));
+        assert_eq!(ok(Expr::string("മലയാളം")), datum("\"മലയാളം\""));
+        assert_eq!(ok(Expr::string("Unicode 😱 ⌘")), datum("\"Unicode 😱 ⌘\""));
+        assert_eq!(ok(Expr::string("")), datum("\"\""))
     }
 
     #[test]
     fn lists() {
-        assert_eq!(ok(List(vec!["+".into(), 1.into()])), list("(+ 1)"));
+        assert_eq!(ok(List(vec![Expr::ident("+"), 1.into()])), list("(+ 1)"));
 
         assert_eq!(
-            ok(List(vec![1.into(), 2.into(), 3.into(), "a".into(), "b".into(), "c".into()])),
+            ok(List(vec![
+                1.into(),
+                2.into(),
+                3.into(),
+                Expr::ident("a"),
+                Expr::ident("b"),
+                Expr::ident("c")
+            ])),
             list("(1 2 3 a b c)")
         );
 
         assert_eq!(
-            ok(List(vec!["inc".into(), List(vec!["inc".into(), 42.into()]),],)),
+            ok(List(vec![Expr::ident("inc"), List(vec![Expr::ident("inc"), 42.into()]),],)),
             list("(inc (inc 42))")
         );
 
@@ -495,12 +511,17 @@ mod tests {
 
     #[test]
     fn binary() {
-        assert_eq!(ok(List(vec!["+".into(), "x".into(), 1776.into()])), list("(+ x 1776)"));
+        assert_eq!(
+            ok(List(vec![Expr::ident("+"), Expr::ident("x"), 1776.into()])),
+            list("(+ x 1776)")
+        );
 
         assert_eq!(
-            ok(List(
-                vec!["+".into(), "x".into(), List(vec!["*".into(), "a".into(), "b".into()],),],
-            )),
+            ok(List(vec![
+                Expr::ident("+"),
+                Expr::ident("x"),
+                List(vec![Expr::ident("*"), Expr::ident("a"), Expr::ident("b")],),
+            ],)),
             list("(+ x (* a b))")
         );
     }
@@ -525,15 +546,15 @@ mod tests {
         let p2 = "(let ((x 1)) (let ((x 2)) #t) x)";
 
         let e1 = Let {
-            bindings: vec![(Ident::from("x"), Number(1)), (Ident::from("y"), Number(2))],
-            body: vec![List(vec![("+".into()), (Expr::from("x")), (Expr::from("y"))])],
+            bindings: vec![(Ident::from("x"), Expr::from(1)), (Ident::from("y"), Expr::from(2))],
+            body: vec![List(vec![Expr::ident("+"), (Expr::ident("x")), (Expr::ident("y"))])],
         };
 
         let e2 = Let {
-            bindings: vec![(Ident::from("x"), Number(1))],
+            bindings: vec![(Ident::from("x"), Expr::from(1))],
             body: vec![
-                Let { bindings: vec![(Ident::from("x"), Number(2))], body: vec![true.into()] },
-                Expr::from("x"),
+                Let { bindings: vec![(Ident::from("x"), Expr::from(2))], body: vec![true.into()] },
+                Expr::ident("x"),
             ],
         };
 
@@ -559,12 +580,12 @@ mod tests {
 
         let prog = "(if (zero? x) 1 (* x (f (dec x))))";
         let exp = Cond {
-            pred: box List(vec!["zero?".into(), "x".into()]),
+            pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
             then: box 1.into(),
             alt: Some(box List(vec![
-                "*".into(),
-                "x".into(),
-                List(vec!["f".into(), List(vec!["dec".into(), "x".into()])]),
+                Expr::ident("*"),
+                Expr::ident("x"),
+                List(vec![Expr::ident("f"), List(vec![Expr::ident("dec"), Expr::ident("x")])]),
             ])),
         };
 
@@ -573,14 +594,14 @@ mod tests {
 
     #[test]
     fn application() {
-        assert_eq!(ok(List(vec!["f".into(), "x".into()])), super::application("(f x)"));
-        assert_eq!(ok(List(vec!["f".into()])), super::application("(f)"));
+        assert_eq!(ok(List(vec![Expr::ident("f"), Expr::ident("x")])), super::application("(f x)"));
+        assert_eq!(ok(List(vec![Expr::ident("f")])), super::application("(f)"));
     }
 
     #[test]
     fn quotes() {
         let p = super::program("(symbol=? 'one 'two)");
-        let e = vec![List(vec!["symbol=?".into(), Symbol("one".into()), Symbol("two".into())])];
+        let e = vec![List(vec![Expr::ident("symbol=?"), Expr::symbol("one"), Expr::symbol("two")])];
 
         assert_eq!(ok(e), p);
     }
@@ -595,7 +616,7 @@ mod tests {
                     val: box Lambda(Closure {
                         tail: false,
                         formals: vec!["x".into()],
-                        body: vec![("x".into())],
+                        body: vec![(Expr::ident("x"))],
                         free: vec![],
                     }),
                 },
@@ -612,7 +633,7 @@ mod tests {
                     }),
                 },
             ),
-            ("(define pi 42)", Define { name: (Ident::new("pi")), val: box Number(42) }),
+            ("(define pi 42)", Define { name: (Ident::new("pi")), val: box Expr::from(42) }),
             (
                 "(define (add a b) (+ a b))",
                 Define {
@@ -620,7 +641,11 @@ mod tests {
                     val: box Lambda(Closure {
                         tail: false,
                         formals: vec!["a".into(), "b".into()],
-                        body: vec![Expr::List(vec!["+".into(), "a".into(), "b".into()])],
+                        body: vec![Expr::List(vec![
+                            Expr::ident("+"),
+                            Expr::ident("a"),
+                            Expr::ident("b"),
+                        ])],
                         free: vec![],
                     }),
                 },
@@ -633,10 +658,10 @@ mod tests {
                         tail: false,
                         formals: vec!["x".into(), "y".into(), "args".into()],
                         body: vec![Expr::List(vec![
-                            "reduce".into(),
-                            "+".into(),
-                            0.into(),
-                            "args".into(),
+                            Expr::ident("reduce"),
+                            Expr::ident("+"),
+                            Expr::from(0),
+                            Expr::ident("args"),
                         ])],
                         free: vec![],
                     }),
@@ -656,8 +681,12 @@ mod tests {
     #[test]
     fn lambda_syntax() {
         let prog = "(lambda () 1)";
-        let exp =
-            Lambda(Closure { tail: false, formals: vec![], body: vec![Number(1)], free: vec![] });
+        let exp = Lambda(Closure {
+            tail: false,
+            formals: vec![],
+            body: vec![Expr::from(1)],
+            free: vec![],
+        });
 
         assert_eq!(ok(vec![exp]), program(prog));
 
@@ -666,7 +695,7 @@ mod tests {
             tail: false,
             formals: vec!["a".into(), "b".into()],
             free: vec![],
-            body: vec![("a".into())],
+            body: vec![(Expr::ident("a"))],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -677,7 +706,7 @@ mod tests {
             tail: false,
             free: vec![],
             formals: vec!["a".into(), "b".into()],
-            body: vec![Expr::List(vec!["+".into(), "b".into(), "a".into()])],
+            body: vec![Expr::List(vec![Expr::ident("+"), Expr::ident("b"), Expr::ident("a")])],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -687,7 +716,7 @@ mod tests {
             tail: false,
             formals: vec!["a".into()],
             free: vec![],
-            body: vec![("a".into())],
+            body: vec![(Expr::ident("a"))],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -708,12 +737,12 @@ mod tests {
             formals: vec!["x".into()],
             free: vec![],
             body: vec![Cond {
-                pred: box List(vec![("zero?".into()), ("x".into())]),
+                pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
                 then: box 1.into(),
                 alt: Some(box List(vec![
-                    "*".into(),
-                    "x".into(),
-                    List(vec!["f".into(), List(vec!["dec".into(), "x".into()])]),
+                    Expr::ident("*"),
+                    Expr::ident("x"),
+                    List(vec![Expr::ident("f"), List(vec![Expr::ident("dec"), Expr::ident("x")])]),
                 ])),
             }],
         });

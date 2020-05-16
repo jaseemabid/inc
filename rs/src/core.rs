@@ -6,6 +6,29 @@ use std::fmt;
 /// Abstract Syntax Tree for a single expression
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
+    Literal(Literal),
+    // Since Rust needs to know the size of the Expr type upfront, we need an
+    // indirection here with `Vec<>` for recursive types. In this context, Vec
+    // is just a convenient way to have a `Box<[Expr]>`
+    List(Vec<Expr>),
+    // Vectors
+    Vector(Vec<Expr>),
+    // Conditional
+    Cond { pred: Box<Expr>, then: Box<Expr>, alt: Option<Box<Expr>> },
+    // Variable bindings
+    Let { bindings: Vec<(Ident, Expr)>, body: Vec<Expr> },
+    // Variable definitions. Similar to let but could be at the top level
+    Define { name: Ident, val: Box<Expr> },
+    // Functions
+    Lambda(Closure),
+}
+
+/// Literal types of Scheme
+//
+// Literals are a separate type to share code across various stages of AST types
+// and to make exhaustive pattern matches more explicit.
+#[derive(Debug, PartialEq, Clone)]
+pub enum Literal {
     // An empty list `()`
     Nil,
     // 61b number with a 3bit tag
@@ -21,20 +44,6 @@ pub enum Expr {
     Identifier(Ident),
     // Symbols
     Symbol(String),
-    // Since Rust needs to know the size of the Expr type upfront, we need an
-    // indirection here with `Vec<>` for recursive types. In this context, Vec
-    // is just a convenient way to have a `Box<[Expr]>`
-    List(Vec<Expr>),
-    // Vectors
-    Vector(Vec<Expr>),
-    // Conditional
-    Cond { pred: Box<Expr>, then: Box<Expr>, alt: Option<Box<Expr>> },
-    // Variable bindings
-    Let { bindings: Vec<(Ident, Expr)>, body: Vec<Expr> },
-    // Variable definitions. Similar to let but could be at the top level
-    Define { name: Ident, val: Box<Expr> },
-    // Functions
-    Lambda(Closure),
 }
 
 /// Ident is a refinement type for an identifier
@@ -85,10 +94,21 @@ impl Expr {
     /// Checks if an expression is in [A-Normal Form](https://en.wikipedia.org/wiki/A-normal_form)
     pub fn anf(&self) -> bool {
         match self {
-            Nil | Number(..) | Boolean(..) | Char(..) => true,
-            Str(..) | Identifier(..) | Symbol(..) | Vector(..) => true,
-            List(..) | Cond { .. } | Let { .. } | Lambda { .. } | Define { .. } => false,
+            Literal(..) => true,
+            _ => false,
         }
+    }
+
+    pub fn symbol<S: Into<String>>(name: S) -> Self {
+        Literal(Literal::Symbol(name.into()))
+    }
+
+    pub fn string<S: Into<String>>(name: S) -> Self {
+        Literal(Literal::Str(name.into()))
+    }
+
+    pub fn ident<S: Into<String>>(name: S) -> Self {
+        Literal(Literal::Identifier(Ident::from(name)))
     }
 }
 
@@ -104,13 +124,13 @@ impl fmt::Display for Ident {
     }
 }
 
-impl fmt::Display for Expr {
+impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expr::Nil => write!(f, "()"),
-            Expr::Number(n) => write!(f, "{}", n),
-            Expr::Boolean(t) => write!(f, "{}", if *t { "#t" } else { "#f" }),
-            Expr::Char(c) => {
+            Self::Number(n) => write!(f, "{}", n),
+            Self::Boolean(t) => write!(f, "{}", if *t { "#t" } else { "#f" }),
+            Self::Nil => write!(f, "()"),
+            Self::Char(c) => {
                 let p = match *c as char {
                     '\t' => "#\\tab".into(),
                     '\n' => "#\\newline".into(),
@@ -121,10 +141,18 @@ impl fmt::Display for Expr {
                 write!(f, "{}", &p)
             }
 
-            Expr::Str(s) => write!(f, "\"{}\"", s),
-            Expr::Identifier(Ident { name, index }) => write!(f, "{}.{}", name, index),
-            Expr::Symbol(i) => write!(f, "'{}", i),
-            Expr::List(l) => {
+            Self::Str(s) => write!(f, "\"{}\"", s),
+            Self::Identifier(Ident { name, index }) => write!(f, "{}.{}", name, index),
+            Self::Symbol(i) => write!(f, "'{}", i),
+        }
+    }
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Literal(l) => write!(f, "{}", l),
+            List(l) => {
                 write!(f, "(")?;
                 let mut l = l.iter().peekable();
                 while let Some(elem) = l.next() {
@@ -139,7 +167,7 @@ impl fmt::Display for Expr {
 
             // TODO: Pretty print ports differently from other vectors
             // Example: #<input/output port stdin/out> | #<output port /tmp/foo.txt>
-            Expr::Vector(l) => {
+            Vector(l) => {
                 write!(f, "[")?;
                 let mut l = l.iter().peekable();
                 while let Some(elem) = l.next() {
@@ -151,18 +179,18 @@ impl fmt::Display for Expr {
                 }
                 write!(f, "]")
             }
-            Expr::Cond { pred, then, alt } => match alt {
+            Cond { pred, then, alt } => match alt {
                 None => write!(f, "(if {} {})", pred, then),
                 Some(t) => write!(f, "(if {} {} {})", pred, then, t),
             },
-            Expr::Let { bindings, body } => {
+            Let { bindings, body } => {
                 write!(f, "(let (")?;
                 bindings.iter().for_each(|(a, b)| write!(f, "({} {})", a, b).unwrap());
                 write!(f, ") ")?;
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
-            Expr::Lambda(Closure { formals, body, tail, .. }) => {
+            Lambda(Closure { formals, body, tail, .. }) => {
                 if *tail {
                     write!(f, "(^λ^ (")?;
                 } else {
@@ -174,7 +202,7 @@ impl fmt::Display for Expr {
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
-            Expr::Define { name, val } => write!(f, "(define {} {})", name, val),
+            Define { name, val } => write!(f, "(define {} {})", name, val),
         }
     }
 }
@@ -183,27 +211,22 @@ impl fmt::Display for Expr {
 ///
 /// https://doc.rust-lang.org/rust-by-example/conversion/from_into.html
 /// https://ricardomartins.cc/2016/08/03/convenient_and_idiomatic_conversions_in_rust
+
 impl From<i64> for Expr {
     fn from(i: i64) -> Self {
-        Expr::Number(i)
+        Expr::Literal(Literal::Number(i))
     }
 }
 
 impl From<bool> for Expr {
     fn from(b: bool) -> Self {
-        Expr::Boolean(b)
+        Expr::Literal(Literal::Boolean(b))
     }
 }
 
 impl From<char> for Expr {
     fn from(c: char) -> Self {
-        Expr::Char(c as u8)
-    }
-}
-
-impl From<&str> for Expr {
-    fn from(i: &str) -> Self {
-        Expr::Identifier(Ident::from(i))
+        Expr::Literal(Literal::Char(c as u8))
     }
 }
 

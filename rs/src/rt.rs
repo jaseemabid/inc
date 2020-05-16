@@ -5,7 +5,8 @@
 //! called from scheme functions.
 
 use crate::{
-    core::{Expr, Expr::*},
+    core::Expr::{self, *},
+    core::Literal::*,
     immediate::{self, *},
     x86::WORDSIZE,
 };
@@ -28,19 +29,19 @@ impl Object {
 
     pub fn deref(&self) -> Expr {
         match (self.0) & MASK {
-            NUM => Number(self.0 >> SHIFT),
-            BOOL => Boolean(self.0 == TRUE),
-            CHAR => Char((self.0 >> SHIFT) as u8),
+            NIL => Literal(Nil),
+            NUM => Literal(Number(self.0 >> SHIFT)),
+            BOOL => Literal(Boolean(self.0 == TRUE)),
+            CHAR => Literal(Char((self.0 >> SHIFT) as u8)),
             PAIR => List(vec![car(*self).deref(), cdr(*self).deref()]),
-            NIL => Nil,
             STR => {
                 // TODO: Read required bytes instead of looking for NUL
                 let s = unsafe { CStr::from_ptr((self.0 - STR + 8) as *const c_char) };
-                Str(s.to_string_lossy().into_owned())
+                Expr::string(s.to_string_lossy())
             }
             SYM => {
                 let s = unsafe { CStr::from_ptr((self.0 - SYM + 16) as *const c_char) };
-                Symbol(s.to_string_lossy().into_owned())
+                Expr::symbol(s.to_string_lossy())
             }
             VEC => Expr::Vector(
                 (0..vec_len(self.0)).map(|i| (Self::new(vec_nth(self.0, i)).deref())).collect(),
@@ -269,7 +270,7 @@ pub mod io {
     #[no_mangle]
     pub extern "C" fn rt_open_write(fname: Object) -> Object {
         match fname.deref() {
-            Str(path) => {
+            Literal(Str(path)) => {
                 let f = File::create(path).unwrap().as_raw_fd();
                 Object::immediate(f as i64)
             }
@@ -282,7 +283,7 @@ pub mod io {
     #[no_mangle]
     pub extern "C" fn rt_open_read(fname: Object) -> Object {
         match fname.deref() {
-            Str(path) => {
+            Literal(Str(path)) => {
                 let f = File::open(path).unwrap().as_raw_fd();
                 Object::immediate(f as i64)
             }
