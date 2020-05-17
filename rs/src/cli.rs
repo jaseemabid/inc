@@ -2,7 +2,7 @@
 
 use crate::{
     compiler::emit,
-    core::{Config, Error, Expr},
+    core::{Config, Error, Syntax},
     parser::parse,
 };
 
@@ -30,7 +30,6 @@ pub fn run(config: &Config, action: Action) -> Result<Option<String>, Error> {
         }
         Action::GenASM => {
             gen(config, prog)?;
-
             Ok(None)
         }
         Action::Run => {
@@ -41,7 +40,7 @@ pub fn run(config: &Config, action: Action) -> Result<Option<String>, Error> {
     }
 }
 
-pub fn gen<'a>(config: &'a Config, prog: Vec<Expr>) -> Result<(), Error<'a>> {
+pub fn gen<'a>(config: &'a Config, prog: Vec<Syntax>) -> Result<(), Error<'a>> {
     let mut handler = File::create(&config.asm()).or_else(|e| {
         Err(Error::Internal { message: format!("Failed to create {}", &config.asm()), e: Some(e) })
     })?;

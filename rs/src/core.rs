@@ -1,30 +1,29 @@
 //! Core types shared by most of the program
 use self::Expr::*;
 use colored::Colorize;
-use std::fmt;
+use std::{clone::Clone, fmt};
 
-/// Abstract Syntax Tree for a single expression
+/// Parameterized Abstract Syntax Tree for Scheme
 #[derive(Debug, PartialEq, Clone)]
-pub enum Expr {
-    // Constant expressions
+pub enum Expr<T: Clone> {
     Literal(Literal),
-    // Scheme Identifiers
-    Identifier(Ident),
-    // Since Rust needs to know the size of the Expr type upfront, we need an
-    // indirection here with `Vec<>` for recursive types. In this context, Vec
-    // is just a convenient way to have a `Box<[Expr]>`
-    List(Vec<Expr>),
-    // Vectors
-    Vector(Vec<Expr>),
-    // Conditional
-    Cond { pred: Box<Expr>, then: Box<Expr>, alt: Option<Box<Expr>> },
-    // Variable bindings
-    Let { bindings: Vec<(Ident, Expr)>, body: Vec<Expr> },
-    // Variable definitions. Similar to let but could be at the top level
-    Define { name: Ident, val: Box<Expr> },
-    // Functions
-    Lambda(Closure),
+    // Scheme Identifiers, parameterized by T. Could be a String or `Ident`
+    Identifier(T),
+    List(Vec<Expr<T>>),
+    Vector(Vec<Expr<T>>),
+    Cond { pred: Box<Expr<T>>, then: Box<Expr<T>>, alt: Option<Box<Expr<T>>> },
+    Let { bindings: Vec<(T, Expr<T>)>, body: Vec<Expr<T>> },
+    Define { name: T, val: Box<Expr<T>> },
+    Lambda(Closure<T>),
 }
+
+/// Syntax representation or Stage 0 of the AST
+///
+/// Parser generates one of these values
+pub type Syntax = Expr<String>;
+
+/// Core AST or Stage 1+
+pub type Core = Expr<Ident>;
 
 /// Literal types of Scheme
 //
@@ -76,22 +75,26 @@ impl Ident {
             _ => unreachable!(),
         }
     }
+
+    pub fn expr<S: Into<String>>(name: S) -> Expr<Ident> {
+        Expr::Identifier(Ident::from(name))
+    }
 }
 
 /// Closure is a refinement type for Expression specialized for lambdas
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct Closure {
+#[derive(Clone, Debug, PartialEq)]
+pub struct Closure<T: Clone> {
     // Formal arguments to the function, filled in by the parser
     pub formals: Vec<String>,
     // Free variables, added post closure conversion
     pub free: Vec<String>,
     // A body is a list of expressions evaluated in order
-    pub body: Vec<Expr>,
+    pub body: Vec<Expr<T>>,
     // Is this a tail call?
     pub tail: bool,
 }
 
-impl Expr {
+impl<T: Clone> Expr<T> {
     /// Checks if an expression is in [A-Normal Form](https://en.wikipedia.org/wiki/A-normal_form)
     pub fn anf(&self) -> bool {
         match self {
@@ -107,13 +110,14 @@ impl Expr {
     pub fn string<S: Into<String>>(name: S) -> Self {
         Literal(Literal::Str(name.into()))
     }
+}
 
-    pub fn ident<S: Into<String>>(name: S) -> Self {
-        Self::Identifier(Ident::from(name))
+impl Expr<String> {
+    pub fn name<S: Into<String>>(name: S) -> Self {
+        Self::Identifier(name.into())
     }
 }
 
-/// Pretty print an Expr
 impl fmt::Display for Ident {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Ident { name, index } = self;
@@ -148,11 +152,11 @@ impl fmt::Display for Literal {
     }
 }
 
-impl fmt::Display for Expr {
+impl<T: Clone + fmt::Display> fmt::Display for Expr<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Literal(l) => write!(f, "{}", l),
-            Identifier(Ident { name, index }) => write!(f, "{}.{}", name, index),
+            Identifier(i) => write!(f, "{}", i),
             List(l) => {
                 write!(f, "(")?;
                 let mut l = l.iter().peekable();
@@ -213,21 +217,21 @@ impl fmt::Display for Expr {
 /// https://doc.rust-lang.org/rust-by-example/conversion/from_into.html
 /// https://ricardomartins.cc/2016/08/03/convenient_and_idiomatic_conversions_in_rust
 
-impl From<i64> for Expr {
+impl<T: Clone> From<i64> for Expr<T> {
     fn from(i: i64) -> Self {
-        Expr::Literal(Literal::Number(i))
+        Self::Literal(Literal::Number(i))
     }
 }
 
-impl From<bool> for Expr {
+impl<T: Clone> From<bool> for Expr<T> {
     fn from(b: bool) -> Self {
-        Expr::Literal(Literal::Boolean(b))
+        Self::Literal(Literal::Boolean(b))
     }
 }
 
-impl From<char> for Expr {
+impl<T: Clone> From<char> for Expr<T> {
     fn from(c: char) -> Self {
-        Expr::Literal(Literal::Char(c as u8))
+        Self::Literal(Literal::Char(c as u8))
     }
 }
 

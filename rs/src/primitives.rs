@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Call compiler primitive by name
-pub fn call(s: &mut State, fname: &str, args: &[Expr]) -> Option<ASM> {
+pub fn call(s: &mut State, fname: &str, args: &[Core]) -> Option<ASM> {
     match (fname, args) {
         ("%", [x, y]) => Some(remainder(s, x, y)),
         ("*", [x, y]) => Some(mul(s, x, y)),
@@ -57,12 +57,12 @@ pub fn call(s: &mut State, fname: &str, args: &[Expr]) -> Option<ASM> {
 // Unary Primitives
 
 /// Increment number by 1
-fn inc(s: &mut State, x: &Expr) -> ASM {
+fn inc(s: &mut State, x: &Core) -> ASM {
     eval(s, x) + x86::add(RAX.into(), immediate::n(1).into())
 }
 
 /// Decrement by 1
-fn dec(s: &mut State, x: &Expr) -> ASM {
+fn dec(s: &mut State, x: &Core) -> ASM {
     eval(s, x) + x86::sub(RAX.into(), immediate::n(1).into())
 }
 
@@ -74,54 +74,54 @@ fn dec(s: &mut State, x: &Expr) -> ASM {
 /// (fixnum? 42) => #t
 /// (fixnum? "hello") => #f
 /// ```
-fn fixnump(s: &mut State, expr: &Expr) -> ASM {
+fn fixnump(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + mask() + compare(RAX.into(), immediate::NUM.into(), "sete")
 }
 
 /// Is the expression a boolean?
-fn booleanp(s: &mut State, expr: &Expr) -> ASM {
+fn booleanp(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + mask() + compare(RAX.into(), immediate::BOOL.into(), "sete")
 }
 
 /// Is the expression a char?
-fn charp(s: &mut State, expr: &Expr) -> ASM {
+fn charp(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + mask() + compare(RAX.into(), immediate::CHAR.into(), "sete")
 }
 
 /// Is the expression null?
-fn nullp(s: &mut State, expr: &Expr) -> ASM {
+fn nullp(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + compare(RAX.into(), immediate::NIL.into(), "sete")
 }
 
 /// Is the expression a pair?
-fn pairp(s: &mut State, expr: &Expr) -> ASM {
+fn pairp(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + mask() + compare(RAX.into(), immediate::PAIR.into(), "sete")
 }
 
 /// Is the expression a string?
-fn stringp(s: &mut State, expr: &Expr) -> ASM {
+fn stringp(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + mask() + compare(RAX.into(), immediate::STR.into(), "sete")
 }
 
 /// Is the expression a symbol?
-fn symbolp(s: &mut State, expr: &Expr) -> ASM {
+fn symbolp(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + mask() + compare(RAX.into(), immediate::SYM.into(), "sete")
 }
 
 /// Is the expression zero?
-fn zerop(s: &mut State, expr: &Expr) -> ASM {
+fn zerop(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + compare(RAX.into(), immediate::NUM.into(), "sete")
 }
 
 /// Logical not
-fn not(s: &mut State, expr: &Expr) -> ASM {
+fn not(s: &mut State, expr: &Core) -> ASM {
     eval(s, expr) + compare(RAX.into(), immediate::FALSE.into(), "sete")
 }
 
 // Binary Primitives
 
 /// Evaluate arguments and store the first argument in stack and second in `RAX`
-fn binop(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn binop(s: &mut State, x: &Core, y: &Core) -> ASM {
     let t = s.alloc();
     let ctx = eval(s, x) + x86::save(RAX.into(), t) + eval(s, y);
     s.dealloc(1);
@@ -129,7 +129,7 @@ fn binop(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 }
 
 /// Add `x` and `y` and move result to register RAX
-fn plus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn plus(s: &mut State, x: &Core, y: &Core) -> ASM {
     binop(s, &x, &y) + x86::add(RAX.into(), Reference::from(RBP + s.si))
 }
 
@@ -144,7 +144,7 @@ fn plus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 //     y: RAX -> RDI
 //     x: [RBP - 8] -> RAX
 //     RAX  = RAX (x) - RDI (y)
-fn minus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn minus(s: &mut State, x: &Core, y: &Core) -> ASM {
     binop(s, &x, &y)
         + x86::mov(RDI.into(), RAX.into())
         + x86::mov(RAX.into(), Reference::from(RBP + s.si))
@@ -155,7 +155,7 @@ fn minus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 // The destination operand is of `mul` is an implied operand located in register
 // AX. GCC throws `Error: ambiguous operand size for `mul'` without size
 // quantifier
-fn mul(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn mul(s: &mut State, x: &Core, y: &Core) -> ASM {
     binop(s, &x, &y)
         + x86::sar(RAX.into(), immediate::SHIFT.into())
         + x86::mul(Reference::from(RBP + s.si))
@@ -171,7 +171,7 @@ fn mul(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 //
 // Dividend is passed in RDX:RAX and IDIV instruction takes the divisor as the
 // argument. the quotient is stored in RAX and the remainder in RDX.
-fn div(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn div(s: &mut State, x: &Core, y: &Core) -> ASM {
     eval(s, y)
         + x86::sar(RAX.into(), immediate::SHIFT.into())
         + x86::mov(RCX.into(), RAX.into())
@@ -183,12 +183,12 @@ fn div(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 }
 
 /// Quotient after dividing `x` by `y`
-fn quotient(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn quotient(s: &mut State, x: &Core, y: &Core) -> ASM {
     div(s, x, y) + x86::sal(RAX.into(), immediate::SHIFT.into())
 }
 
 /// Remainder after dividing `x` by `y`
-fn remainder(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn remainder(s: &mut State, x: &Core, y: &Core) -> ASM {
     div(s, x, y) + x86::mov(RAX.into(), RDX.into()) + x86::sal(RAX.into(), immediate::SHIFT.into())
 }
 
@@ -209,27 +209,27 @@ fn compare(a: Reference, b: Reference, setcc: &str) -> ASM {
 }
 
 /// Logical eq
-fn eq(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn eq(s: &mut State, x: &Core, y: &Core) -> ASM {
     binop(s, x, y) + compare(Reference::from(RBP + s.si), RAX.into(), "sete")
 }
 
 /// Logical <
-fn lt(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn lt(s: &mut State, x: &Core, y: &Core) -> ASM {
     binop(s, x, y) + compare(Reference::from(RBP + s.si), RAX.into(), "setl")
 }
 
 /// Logical >
-fn gt(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn gt(s: &mut State, x: &Core, y: &Core) -> ASM {
     binop(s, x, y) + compare(Reference::from(RBP + s.si), RAX.into(), "setg")
 }
 
 /// Logical <=
-fn lte(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn lte(s: &mut State, x: &Core, y: &Core) -> ASM {
     binop(s, x, y) + compare(Reference::from(RBP + s.si), RAX.into(), "setle")
 }
 
 /// Logical >=
-fn gte(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn gte(s: &mut State, x: &Core, y: &Core) -> ASM {
     binop(s, x, y) + compare(Reference::from(RBP + s.si), RAX.into(), "setge")
 }
 
@@ -237,7 +237,7 @@ fn gte(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 
 /// Allocate a pair on heap
 #[allow(clippy::identity_op)]
-fn cons(s: &mut State, x: &Expr, y: &Expr) -> ASM {
+fn cons(s: &mut State, x: &Core, y: &Core) -> ASM {
     // 1. Evaluate the first argument and push to stack
     // 2. Evaluate second argument
     // 3. Write second arg to [heap + 8]
@@ -264,14 +264,14 @@ fn cons(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 
 /// First half of a pair
 // Subtracting the tag from the heap pointer gets us back the real address.
-fn car(s: &mut State, pair: &Expr) -> ASM {
+fn car(s: &mut State, pair: &Core) -> ASM {
     // Assert destination is really a pair ?
     eval(s, pair) + Ins(format!("mov rax, [rax - {}]    # (car ..)", immediate::PAIR))
 }
 
 /// Second half of a pair
 // Offset for cdr is (address - tag + 8) = 5
-fn cdr(s: &mut State, pair: &Expr) -> ASM {
+fn cdr(s: &mut State, pair: &Core) -> ASM {
     // Assert destination is really a pair ?
     eval(s, pair) + Ins(format!("mov rax, [rax + {}]    # (cdr ...)", 5))
 }
@@ -279,7 +279,7 @@ fn cdr(s: &mut State, pair: &Expr) -> ASM {
 /// Allocate a vector on heap
 // Allows `R12 + 0`, its not ineffective
 #[allow(clippy::identity_op)]
-fn vector(s: &mut State, exprs: &[Expr]) -> ASM {
+fn vector(s: &mut State, exprs: &[Core]) -> ASM {
     // Vectors are length prefixed like strings
     let mut asm: ASM = x86::mov(Relative(R12 + 0), Const(exprs.len() as i64)).into();
 

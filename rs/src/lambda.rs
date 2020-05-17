@@ -30,12 +30,12 @@
 //! SysV at some point.
 use crate::{
     compiler::{emit::eval, state::State},
-    core::{Closure, Expr, Ident},
+    core::{Closure, Core, Expr, Ident},
     x86::{self, Reference, Register::*, Relative, ASM, WORDSIZE},
 };
 
 /// Emit machine code for all top level functions
-pub fn emit(s: &mut State, exprs: &[Expr]) -> ASM {
+pub fn emit(s: &mut State, exprs: &[Core]) -> ASM {
     let mut asm = ASM(vec![]);
 
     for expr in exprs.iter() {
@@ -60,7 +60,7 @@ pub fn emit(s: &mut State, exprs: &[Expr]) -> ASM {
 /// etc. The function preamble effectively decrements the base pointer by `0x10`
 /// such that the such that the first argument can be accessed at `RBP - 8`, the
 /// next one at `RBP - 16` etc.
-fn emit1(s: &mut State, name: &Ident, code: &Closure) -> ASM {
+fn emit1(s: &mut State, name: &Ident, code: &Closure<Ident>) -> ASM {
     let mut asm = ASM(vec![]);
 
     asm += x86::func(&name.to_string());
@@ -92,7 +92,7 @@ fn emit1(s: &mut State, name: &Ident, code: &Closure) -> ASM {
 }
 
 /// Emit code for a function application. See `code` for details.
-pub fn call(s: &mut State, name: &Ident, args: &[Expr]) -> ASM {
+pub fn call(s: &mut State, name: &Ident, args: &[Core]) -> ASM {
     // Evaluate and push the arguments into stack; 2 words below SI. See
     // `code` docs for a detailed description of how this works.
     //

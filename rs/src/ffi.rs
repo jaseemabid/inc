@@ -14,13 +14,13 @@
 
 use crate::{
     compiler::{emit::eval, state::State},
-    core::Expr,
+    core::Core,
     immediate,
     x86::{self, Reference::*, Register::*, ASM, WORDSIZE},
 };
 
 /// Call a foreign function defined in Rust/C
-pub fn call(s: &mut State, name: &str, args: &[Expr]) -> ASM {
+pub fn call(s: &mut State, name: &str, args: &[Core]) -> ASM {
     let mut asm = ASM(vec![]);
 
     if args.len() > 6 {

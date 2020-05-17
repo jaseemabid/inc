@@ -171,11 +171,7 @@ pub mod state {
 pub mod emit {
     use crate::{
         compiler::state::State,
-        core::{
-            Expr::{self, *},
-            Ident,
-            Literal::*,
-        },
+        core::{Core, Expr::*, Ident, Literal::*, Syntax},
         x86::{self, Ins, Reference, Register::*, Relative, ASM},
         *,
     };
@@ -193,7 +189,7 @@ pub mod emit {
     /// stays the same before and after a let expression. There is no need to
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
-    pub fn vars(s: &mut State, vars: &[(Ident, Expr)], body: &[Expr]) -> ASM {
+    pub fn vars(s: &mut State, vars: &[(Ident, Core)], body: &[Core]) -> ASM {
         let mut asm = ASM(vec![]);
 
         s.enter();
@@ -217,7 +213,7 @@ pub mod emit {
     }
 
     /// Emit code for a conditional expression
-    pub fn cond(s: &mut State, p: &Expr, then: &Expr, alt: &Option<Box<Expr>>) -> ASM {
+    pub fn cond(s: &mut State, p: &Core, then: &Core, alt: &Option<Box<Core>>) -> ASM {
         let exit_label = s.gen_label("exit");
         let alt_label = s.gen_label("else");
 
@@ -247,7 +243,7 @@ pub mod emit {
     // into any specific branch here.
 
     #[allow(clippy::redundant_pattern)]
-    pub fn eval(s: &mut State, prog: &Expr) -> ASM {
+    pub fn eval(s: &mut State, prog: &Core) -> ASM {
         match prog {
             Identifier(i) => match s.get(&i) {
                 Some(index) => x86::mov(RAX.into(), index.clone()).into(),
@@ -290,7 +286,7 @@ pub mod emit {
     }
 
     /// Top level interface to the emit module
-    pub fn program(prog: Vec<Expr>) -> String {
+    pub fn program(prog: Vec<Syntax>) -> String {
         let mut s: State = Default::default();
 
         let prog = lang::rename(prog);

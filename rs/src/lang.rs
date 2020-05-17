@@ -6,9 +6,12 @@ use crate::{
     core::{Expr::*, Literal::*, *},
 };
 
-use std::collections::HashMap;
+use {std::clone::Clone, std::collections::HashMap};
 
-/// Rename/mangle all references to unique names.
+/// Rename/mangle all references to unique names
+///
+/// The type change from Expr<String> to Expr<Ident> conveys the basic idea.
+/// Names in the source is transformed into unique identifiers with metadata.
 ///
 /// This is a fairly complicated thing to get right and being able to reuse a
 /// well tested existing implementation would be great. See [RFC 2603], its
@@ -17,33 +20,21 @@ use std::collections::HashMap;
 /// [RFC 2603]: https://github.com/rust-lang/rfcs/blob/master/text/2603-rust-symbol-name-mangling-v0.md
 /// [discussion]: https://github.com/rust-lang/rfcs/pull/2603
 /// [tracking issue]: https://github.com/rust-lang/rust/issues/60705
-pub fn rename(prog: Vec<Expr>) -> Vec<Expr> {
+///
+pub fn rename(prog: Vec<Syntax>) -> Vec<Core> {
     // TODO: This isn't right, same state should be used for all sub expressions.
     // Test for 2 different functions with the same name.
     prog.into_iter().map(|e| mangle(&HashMap::<&str, i64>::new(), e)).collect()
 }
 
-/// Lift all expressions in a program.
-//
-// Each sub expression may result in multiple expressions and it gets flattened
-// at the top level. For example, a let expression binding 2 functions will
-// expand to 3 expressions.
-//
-// Some values must be lifted to the top level to ease certain stages of the
-// compiler. Actions are specific to the types - strings and symbols are added
-// to a lookup table and lambda definitions are raised to top level.
-pub fn lift(s: &mut State, prog: Vec<Expr>) -> Vec<Expr> {
-    prog.into_iter().flat_map(|expr| lift1(s, expr)).collect()
-}
-
-fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
+fn mangle(env: &HashMap<&str, i64>, prog: Syntax) -> Core {
     match prog {
-        Identifier(ident) => Identifier(match env.get(ident.name.as_str()) {
-            Some(n) => Ident { name: ident.name.clone(), index: *n },
-            None => ident,
-        }),
+        Identifier(s) => match env.get(s.as_str()) {
+            Some(n) => Expr::Identifier(Ident { name: s.to_string(), index: *n }),
+            None => Ident::expr(s),
+        },
 
-        Let { bindings, body } => mangle1(env, bindings, body),
+        Let { bindings, body } => mangle_let(env, bindings, body),
 
         List(list) => List(list.into_iter().map(|l| mangle(env, l)).collect()),
 
@@ -53,21 +44,32 @@ fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
             alt: alt.map(|u| box mangle(env, *u)),
         },
 
-        Lambda(code) => Lambda(Closure {
-            body: code.body.into_iter().map(|b| mangle(env, b)).collect(),
-            ..code
+        Lambda(Closure { formals, free, body, tail }) => Lambda(Closure {
+            formals,
+            free,
+            body: body.into_iter().map(|b| mangle(env, b)).collect(),
+            tail,
         }),
 
+        // XXX; This is wrong, but some test is gonna catch this!
+        Define { name, val } => Define { name: Ident::from(name), val: box mangle(env, *val) },
+
+        Vector(list) => Vector(list.into_iter().map(|l| mangle(env, l)).collect()),
+
         // All literals and constants evaluate to itself
-        v => v,
+        Literal(v) => Literal(v),
     }
 }
 
-fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Expr>) -> Expr {
+fn mangle_let(
+    env: &HashMap<&str, i64>,
+    bindings: Vec<(String, Syntax)>,
+    body: Vec<Syntax>,
+) -> Core {
     // Collect all the names about to be bound for evaluating body
     let mut all = env.clone();
-    for (ident, _index) in bindings.iter() {
-        all.entry(ident.name.as_str()).and_modify(|e| *e += 1).or_insert(0);
+    for (name, _index) in bindings.iter() {
+        all.entry(name.as_str()).and_modify(|e| *e += 1).or_insert(0);
     }
 
     // A sub expression in let binding is evaluated with the complete
@@ -80,9 +82,9 @@ fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Exp
             .map(|(current, value)| {
                 // Collect all the names excluding the one being defined now
                 let mut rest = env.clone();
-                for (ident, _) in bindings.iter() {
-                    if ident != current {
-                        rest.entry(ident.name.as_str()).and_modify(|e| *e += 1).or_insert(0);
+                for (name, _) in bindings.iter() {
+                    if name != current {
+                        rest.entry(name.as_str()).and_modify(|e| *e += 1).or_insert(0);
                     }
                 }
 
@@ -92,10 +94,8 @@ fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Exp
                     _ => mangle(&rest, value.clone()),
                 };
 
-                let ident = Ident {
-                    index: *all.get(current.name.as_str()).unwrap(),
-                    name: current.name.clone(),
-                };
+                let ident =
+                    Ident { index: *all.get(current.as_str()).unwrap(), name: current.to_string() };
 
                 (ident, value)
             })
@@ -105,12 +105,25 @@ fn mangle1(env: &HashMap<&str, i64>, bindings: Vec<(Ident, Expr)>, body: Vec<Exp
     }
 }
 
+/// Lift all expressions in a program.
+//
+// Each sub expression may result in multiple expressions and it gets flattened
+// at the top level. For example, a let expression binding 2 functions will
+// expand to 3 expressions.
+//
+// Some values must be lifted to the top level to ease certain stages of the
+// compiler. Actions are specific to the types - strings and symbols are added
+// to a lookup table and lambda definitions are raised to top level.
+pub fn lift(s: &mut State, prog: Vec<Core>) -> Vec<Core> {
+    prog.into_iter().flat_map(|expr| lift1(s, expr)).collect()
+}
+
 // Function names are guaranteed to be unique after mangling, so its safe to
 // lift *ALL* lambdas to top level.
 //
 // NOTE: ☝ this isn't currently right, because mangle doesn't cover all edge
 // cases, but lift should be able to assume so.
-fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
+fn lift1(s: &mut State, prog: Core) -> Vec<Core> {
     match prog {
         Literal(Str(reference)) => {
             if !s.strings.contains_key(&reference) {
@@ -128,7 +141,7 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
 
         Let { bindings, body } => {
             // Rest is all the name bindings that are not functions
-            let rest: Vec<(Ident, Expr)> = bindings
+            let rest: Vec<(Ident, Core)> = bindings
                 .iter()
                 .filter_map(|(ident, expr)| match expr {
                     Lambda(_) => None,
@@ -136,7 +149,7 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
                 })
                 .collect();
 
-            let mut export: Vec<Expr> = bindings
+            let mut export: Vec<Core> = bindings
                 .into_iter()
                 .filter_map(|(name, expr)| match expr {
                     Lambda(code) => {
@@ -183,11 +196,11 @@ fn lift1(s: &mut State, prog: Expr) -> Vec<Expr> {
 ///
 /// The generated names are NOT guaranteed to be unique and could be a problem
 /// down the line.
-pub fn anf(prog: Vec<Expr>) -> Vec<Expr> {
+pub fn anf(prog: Vec<Core>) -> Vec<Core> {
     prog.into_iter().map(anf1).collect()
 }
 
-fn anf1(prog: Expr) -> Expr {
+fn anf1(prog: Core) -> Core {
     match prog {
         List(list) => {
             let (car, cdr) = list.split_at(1);
@@ -205,7 +218,7 @@ fn anf1(prog: Expr) -> Expr {
 
                 // Collect arguments for the function call where complex
                 // expressions are replaced with a variable name
-                let args: Vec<Expr> = cdr
+                let args: Vec<Core> = cdr
                     .iter()
                     .enumerate()
                     .map(|(i, e)| {
@@ -217,7 +230,7 @@ fn anf1(prog: Expr) -> Expr {
                     })
                     .collect();
 
-                let body: Expr = List(car.iter().chain(args.iter()).cloned().collect());
+                let body: Core = List(car.iter().chain(args.iter()).cloned().collect());
 
                 Let { bindings: bindings.collect(), body: vec![body] }
             }
@@ -229,7 +242,7 @@ fn anf1(prog: Expr) -> Expr {
 // Shrink a vector of expressions into a single expression
 //
 // TODO: Replace with `(begin ...)`, list really isn't the same thing
-fn shrink(es: Vec<Expr>) -> Expr {
+fn shrink<T: Clone>(es: Vec<Expr<T>>) -> Expr<T> {
     match es.len() {
         0 => Literal(Nil),
         1 => es[0].clone(),
@@ -238,8 +251,8 @@ fn shrink(es: Vec<Expr>) -> Expr {
 }
 
 // Annotate tail calls with a marker
-pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
-    fn is_tail(name: &Ident, code: &Closure) -> bool {
+pub fn tco(exprs: Vec<Core>) -> Vec<Core> {
+    fn is_tail(name: &Ident, code: &Closure<Ident>) -> bool {
         // Get the expression in tail call position
         let last = code.body.last().and_then(tail);
 
@@ -267,6 +280,7 @@ pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
                         Lambda(code) => {
                             (name.clone(), Lambda(Closure { tail: is_tail(&name, &code), ..code }))
                         }
+
                         _ => (name, value),
                     })
                     .collect();
@@ -289,7 +303,7 @@ pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
 /// 3. If the conditional expression (if test conseq altern) is in tail
 ///    position, then the conseq and altern branches are also in tail position.
 /// 4. All other expressions are not in tail position.
-fn tail(e: &Expr) -> Option<&Expr> {
+fn tail<T: std::clone::Clone>(e: &Expr<T>) -> Option<&Expr<T>> {
     match e {
         // Lambda(Closure { body, .. }) => body.last().map(tail).flatten(),
         Let { body, .. } => body.last().and_then(tail),
@@ -310,7 +324,14 @@ mod tests {
     #[test]
     fn shadow1() {
         let x = parse1("(let ((x 1)) (let ((x 2)) (+ x x)))");
-        let y = parse1("(let ((x.0 1)) (let ((x.1 2)) (+ x.1 x.1)))");
+
+        let y = Let {
+            bindings: vec![(Ident::from("x.0"), Expr::from(1))],
+            body: vec![Let {
+                bindings: vec![(Ident::from("x.1"), Expr::from(2))],
+                body: vec![List(vec![Ident::expr("+"), Ident::expr("x.1"), Ident::expr("x.1")])],
+            }],
+        };
 
         assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
     }
@@ -318,30 +339,23 @@ mod tests {
     #[test]
     fn shadow2() {
         let x = parse1("(let ((t (cons 1 2))) (let ((t t)) (let ((t t)) (let ((t t)) t))))");
-        let y = parse1(
-            "(let ((t.0 (cons 1 2))) (let ((t.1 t.0)) (let ((t.2 t.1)) (let ((t.3 t.2)) t.3))))",
-        );
 
-        assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
-    }
-
-    #[test]
-    fn shadow3() {
-        let x = parse1(
-            "(let ((x ()))
-               (let ((x (cons x x)))
-                 (let ((x (cons x x)))
-                   (let ((x (cons x x)))
-                     (cons x x)))))",
-        );
-
-        let y = parse1(
-            "(let ((x.0 ()))
-               (let ((x.1 (cons x.0 x.0)))
-                 (let ((x.2 (cons x.1 x.1)))
-                   (let ((x.3 (cons x.2 x.2)))
-                     (cons x.3 x.3)))))",
-        );
+        let y = Let {
+            bindings: vec![(
+                Ident::from("t.0"),
+                List(vec![Ident::expr("cons"), Literal(Number(1)), Literal(Number(2))]),
+            )],
+            body: vec![Let {
+                bindings: vec![(Ident::from("t.1"), Ident::expr("t.0"))],
+                body: vec![Let {
+                    bindings: vec![(Ident::from("t.2"), Ident::expr("t.1"))],
+                    body: vec![Let {
+                        bindings: vec![(Ident::from("t.3"), Ident::expr("t.2"))],
+                        body: vec![Ident::expr("t.3")],
+                    }],
+                }],
+            }],
+        };
 
         assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
     }
@@ -349,7 +363,14 @@ mod tests {
     #[test]
     fn alias() {
         let x = parse1("(let ((x 1)) (let ((x x)) (+ x x)))");
-        let y = parse1("(let ((x.0 1)) (let ((x.1 x.0)) (+ x.1 x.1)))");
+
+        let y = Let {
+            bindings: vec![(Ident::from("x.0"), Expr::from(1))],
+            body: vec![Let {
+                bindings: vec![(Ident::from("x.1"), Ident::expr("x.0"))],
+                body: vec![List(vec![Ident::expr("+"), Ident::expr("x.1"), Ident::expr("x.1")])],
+            }],
+        };
 
         assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
     }
@@ -357,9 +378,15 @@ mod tests {
     #[test]
     fn anf() {
         let x = parse1("(f (+ 1 2) 7)");
-        let y = parse1("(let ((_0 (+ 1 2))) (f _0 7))");
+        let y = Let {
+            bindings: vec![(
+                Ident::from("_0"),
+                List(vec![Ident::expr("+"), Literal(Number(1)), Literal(Number(2))]),
+            )],
+            body: vec![List(vec![Ident::expr("f"), Ident::expr("_0"), Literal(Number(7))])],
+        };
 
-        assert_eq!(y, anf1(x));
+        assert_eq!(y, anf1(mangle(&HashMap::<&str, i64>::new(), x)));
     }
 
     #[test]
@@ -381,11 +408,12 @@ mod tests {
                     Lambda(Closure {
                         formals: vec!["x".into()],
                         body: vec![List(vec![
-                            Expr::ident("g"),
-                            Expr::ident("x"),
-                            Expr::ident("x")
+                            Ident::expr("g"),
+                            Ident::expr("x"),
+                            Ident::expr("x")
                         ])],
-                        ..Default::default()
+                        free: vec![],
+                        tail: false
                     })
                 );
 
@@ -395,15 +423,16 @@ mod tests {
                     Lambda(Closure {
                         formals: vec!["x".to_string(), "y".to_string()],
                         body: vec![List(vec![
-                            Expr::ident("+"),
-                            Expr::ident("x"),
-                            Expr::ident("y")
+                            Ident::expr("+"),
+                            Ident::expr("x"),
+                            Ident::expr("y")
                         ])],
-                        ..Default::default()
+                        free: vec![],
+                        tail: false
                     })
                 );
 
-                assert_eq!(body, vec![List(vec![Expr::ident("f"), Expr::from(12)])]);
+                assert_eq!(body, vec![List(vec![Ident::expr("f"), Expr::from(12)])]);
             }
             _ => panic!(),
         }
@@ -418,28 +447,28 @@ mod tests {
                     formals: vec!["x".into()],
                     free: vec![],
                     body: vec![Cond {
-                        pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
+                        pred: box List(vec![Ident::expr("zero?"), Ident::expr("x")]),
                         then: box Expr::from(1),
                         alt: Some(box List(vec![
-                            Expr::ident("*"),
-                            Expr::ident("x"),
+                            Ident::expr("*"),
+                            Ident::expr("x"),
                             List(vec![
-                                Expr::ident("f"),
-                                List(vec![Expr::ident("dec"), Expr::ident("x")]),
+                                Ident::expr("f"),
+                                List(vec![Ident::expr("dec"), Ident::expr("x")]),
                             ]),
                         ])),
                     }],
                     tail: false,
                 }),
             )],
-            body: vec![List(vec![Expr::ident("f"), Expr::from(5)])],
+            body: vec![List(vec![Ident::expr("f"), Expr::from(5)])],
         };
 
         let y = parse1(
-            "(let ((f.0 (lambda (x)
-                          (if (zero? x)
-                            1
-                            (* x (f.0 (dec x))))))) (f.0 5))",
+            "(let ((f (lambda (x)
+                        (if (zero? x)
+                          1
+                          (* x (f (dec x))))))) (f 5))",
         );
 
         assert_eq!(x, mangle(&HashMap::<&str, i64>::new(), y))
@@ -447,8 +476,8 @@ mod tests {
 
     #[test]
     fn lift_simple() {
-        let mut s: State = Default::default();
-        let expr = lift1(&mut s, parse1(r"(let ((id (lambda (x) x))) (id 42))"));
+        let prog = r"(let ((id (lambda (x) x))) (id 42))";
+        let expr = lift1(&mut Default::default(), mangle(&Default::default(), parse1(prog)));
 
         assert_eq!(
             expr[0],
@@ -456,15 +485,16 @@ mod tests {
                 name: Ident::from("id"),
                 val: box Lambda(Closure {
                     formals: vec!["x".into()],
-                    body: vec![Expr::ident("x")],
-                    ..Default::default()
+                    body: vec![Ident::expr("x")],
+                    free: vec![],
+                    tail: false
                 })
             }
         );
 
         assert_eq!(
             expr[1],
-            Let { bindings: vec![], body: vec![List(vec![Expr::ident("id"), Expr::from(42)])] }
+            Let { bindings: vec![], body: vec![List(vec![Ident::expr("id"), Expr::from(42)])] }
         );
     }
 
@@ -474,7 +504,7 @@ mod tests {
                            (odd  (lambda (x) (if (zero? x) #f (even (dec x))))))
                        (e 25)))";
 
-        let expr = lift1(&mut Default::default(), parse1(prog));
+        let expr = lift1(&mut Default::default(), mangle(&Default::default(), parse1(prog)));
 
         assert_eq!(
             expr[0],
@@ -485,11 +515,11 @@ mod tests {
                     formals: vec!["x".into()],
                     free: vec![],
                     body: vec![Cond {
-                        pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
+                        pred: box List(vec![Ident::expr("zero?"), Ident::expr("x")]),
                         then: box Expr::from(true),
                         alt: Some(box List(vec![
-                            Expr::ident("odd"),
-                            List(vec![Expr::ident("dec"), Expr::ident("x")])
+                            Ident::expr("odd"),
+                            List(vec![Ident::expr("dec"), Ident::expr("x")])
                         ]))
                     }]
                 })
@@ -505,11 +535,11 @@ mod tests {
                     formals: vec!["x".into()],
                     free: vec![],
                     body: vec![Cond {
-                        pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
+                        pred: box List(vec![Ident::expr("zero?"), Ident::expr("x")]),
                         then: box Expr::from(false),
                         alt: Some(box List(vec![
-                            Expr::ident("even"),
-                            List(vec![Expr::ident("dec"), Expr::ident("x")])
+                            Ident::expr("even"),
+                            List(vec![Ident::expr("dec"), Ident::expr("x")])
                         ]))
                     }]
                 })
@@ -518,7 +548,7 @@ mod tests {
 
         assert_eq!(
             expr[2],
-            Let { bindings: vec![], body: vec![List(vec![Expr::ident("e"), Expr::from(25)])] }
+            Let { bindings: vec![], body: vec![List(vec![Ident::expr("e"), Expr::from(25)])] }
         );
     }
 

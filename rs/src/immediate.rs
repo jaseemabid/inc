@@ -11,10 +11,7 @@
 //!
 //! See the paper for details. See tests for examples.
 
-use crate::core::{
-    Expr::{self, *},
-    Literal::*,
-};
+use crate::core::{Core, Expr::*, Literal::*};
 
 pub const NUM: i64 = 0;
 pub const BOOL: i64 = 1;
@@ -32,7 +29,7 @@ pub const FALSE: i64 = (0 << SHIFT) | BOOL;
 pub const TRUE: i64 = (1 << SHIFT) | BOOL;
 
 /// Immediate representation of an expression.
-pub fn to(prog: &Expr) -> Option<i64> {
+pub fn to(prog: &Core) -> Option<i64> {
     match prog {
         Literal(Number(i)) => Some((i << SHIFT) | NUM),
         Literal(Boolean(true)) => Some(TRUE),
@@ -62,8 +59,8 @@ mod tests {
 
     #[test]
     fn numbers() {
-        assert_eq!(to(&Expr::from(0)), Some(0));
-        assert_eq!(to(&Expr::from(1)), Some(8));
+        assert_eq!(to(&Core::from(0)), Some(0));
+        assert_eq!(to(&Core::from(1)), Some(8));
     }
 
     #[test]

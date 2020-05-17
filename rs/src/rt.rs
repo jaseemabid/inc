@@ -5,8 +5,11 @@
 //! called from scheme functions.
 
 use crate::{
-    core::Expr::{self, *},
-    core::Literal::*,
+    core::{
+        Core,
+        Expr::{self, *},
+        Literal::*,
+    },
     immediate::{self, *},
     x86::WORDSIZE,
 };
@@ -27,7 +30,7 @@ impl Object {
         Object(immediate::n(num))
     }
 
-    pub fn deref(&self) -> Expr {
+    pub fn deref(&self) -> Core {
         match (self.0) & MASK {
             NIL => Literal(Nil),
             NUM => Literal(Number(self.0 >> SHIFT)),

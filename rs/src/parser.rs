@@ -29,11 +29,11 @@ use std::str;
 /// <program>  → <form>*
 /// <form>     → <definition> | <expression>
 /// ```
-fn program(i: &str) -> IResult<&str, Vec<Expr>> {
+fn program(i: &str) -> IResult<&str, Vec<Syntax>> {
     many1(delimited(space0, form, space0))(i)
 }
 
-fn form(i: &str) -> IResult<&str, Expr> {
+fn form(i: &str) -> IResult<&str, Syntax> {
     alt((definition, expression))(i)
 }
 
@@ -65,7 +65,7 @@ fn form(i: &str) -> IResult<&str, Expr> {
 /// <keyword>           → <identifier>
 /// <syntax binding>    → (<keyword> <transformer expression>)
 /// ```
-fn definition(i: &str) -> IResult<&str, Expr> {
+fn definition(i: &str) -> IResult<&str, Syntax> {
     define_syntax(i) // | begin_syntax
 }
 
@@ -74,38 +74,38 @@ fn definition(i: &str) -> IResult<&str, Expr> {
 /// ✓ (define <variable> <expression>) |
 /// ✓ (define (<variable> <variable>*) <body>) |
 /// ✓ (define (<variable> <variable>* . <variable>) <body>)
-fn define_syntax(i: &str) -> IResult<&str, Expr> {
+fn define_syntax(i: &str) -> IResult<&str, Syntax> {
     alt((define_variable, define_lambda, define_variadic_fn))(i)
 }
 
-fn define_variable(i: &str) -> IResult<&str, Expr> {
+fn define_variable(i: &str) -> IResult<&str, Syntax> {
     let (i, (_, _, _, name, _, body, _)) =
         tuple((open, tag("define"), space1, identifier, space1, expression, close))(i)?;
 
-    Ok((i, Expr::Define { name: Ident::from(name), val: box body }))
+    Ok((i, Expr::Define { name, val: box body }))
 }
 
-fn define_lambda(i: &str) -> IResult<&str, Expr> {
+fn define_lambda(i: &str) -> IResult<&str, Syntax> {
     let (i, _) = tuple((open, tag("define"), space1))(i)?;
     let (i, mut params) = delimited(open, identifiers, close)(i)?;
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
-    let name = Ident::from(params[0].to_string());
+    let name = params[0].to_string();
     let formals = params.split_off(1);
-    let body = Expr::Lambda(Closure { tail: false, formals, body, free: vec![] });
+    let body = Syntax::Lambda(Closure { tail: false, formals, body, free: vec![] });
 
     Ok((i, Expr::Define { name, val: box body }))
 }
 
-fn define_variadic_fn(i: &str) -> IResult<&str, Expr> {
+fn define_variadic_fn(i: &str) -> IResult<&str, Syntax> {
     let (i, _) = tuple((open, tag("define"), space1))(i)?;
     let (i, mut params) = delimited(open, identifiers, tag("."))(i)?;
     let (i, rest_param) = delimited(space1, identifier, close)(i)?;
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
-    let name = Ident::from(params[0].clone());
+    let name = params[0].to_string();
     let mut formals = params.split_off(1);
     formals.push(rest_param);
 
@@ -141,7 +141,7 @@ fn define_variadic_fn(i: &str) -> IResult<&str, Expr> {
 /// <formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)
 /// <application> → (<expression> <expression>*)
 /// ```
-fn expression(i: &str) -> IResult<&str, Expr> {
+fn expression(i: &str) -> IResult<&str, Syntax> {
     alt((
         (map(constant, Expr::Literal)),
         variable,
@@ -154,7 +154,7 @@ fn expression(i: &str) -> IResult<&str, Expr> {
 }
 
 /// `(let-syntax (<syntax binding>*) <expression>+)`
-fn let_syntax(i: &str) -> IResult<&str, Expr> {
+fn let_syntax(i: &str) -> IResult<&str, Syntax> {
     let (i, _) = tuple((open, tag("let"), space1))(i)?;
     let (i, bindings) = delimited(open, many0(binding), close)(i)?;
     let (i, body) = delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
@@ -164,15 +164,15 @@ fn let_syntax(i: &str) -> IResult<&str, Expr> {
 }
 
 /// `named → (name value)`
-fn binding(i: &str) -> IResult<&str, (Ident, Expr)> {
+fn binding(i: &str) -> IResult<&str, (String, Syntax)> {
     let (i, (_, name, _, value, _, _)) =
         tuple((open, identifier, space1, expression, close, space0))(i)?;
 
-    Ok((i, (Ident::from(name), value)))
+    Ok((i, (name, value)))
 }
 
 /// `(lambda <formals> <body>)`
-fn lambda_syntax(i: &str) -> IResult<&str, Expr> {
+fn lambda_syntax(i: &str) -> IResult<&str, Syntax> {
     let (i, (_, _, _, formals, _, body, _, _)) =
         tuple((open, tag("lambda"), space1, formals, space0, body, space0, close))(i)?;
 
@@ -180,7 +180,7 @@ fn lambda_syntax(i: &str) -> IResult<&str, Expr> {
 }
 
 /// `(if <expression> <expression> <expression>) | (if <expression> <expression>)`
-fn if_syntax(i: &str) -> IResult<&str, Expr> {
+fn if_syntax(i: &str) -> IResult<&str, Syntax> {
     let (i, (_, _, _, pred, _, then, alt, _, _)) = tuple((
         open,
         tag("if"),
@@ -197,8 +197,8 @@ fn if_syntax(i: &str) -> IResult<&str, Expr> {
 }
 
 /// variable is an identifier
-fn variable(i: &str) -> IResult<&str, Expr> {
-    map(identifier, Expr::ident)(i)
+fn variable(i: &str) -> IResult<&str, Syntax> {
+    map(identifier, Expr::Identifier)(i)
 }
 
 /// `<formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)`
@@ -210,7 +210,7 @@ fn formals(i: &str) -> IResult<&str, Vec<String>> {
 }
 
 /// `<body> → <definition>* <expression>+`
-fn body(i: &str) -> IResult<&str, Vec<Expr>> {
+fn body(i: &str) -> IResult<&str, Vec<Syntax>> {
     let (i, mut es) = many1(expression)(i)?;
 
     let mut v = Vec::new();
@@ -220,7 +220,7 @@ fn body(i: &str) -> IResult<&str, Vec<Expr>> {
 
 /// (quote <datum>) | '<datum>
 // Note: This parser only handles simple quoted symbols for now
-fn quote(i: &str) -> IResult<&str, Expr> {
+fn quote(i: &str) -> IResult<&str, Syntax> {
     map(tuple((tag("\'"), identifier)), |(_, i)| Expr::symbol(i))(i)
 }
 
@@ -236,7 +236,7 @@ fn constant(i: &str) -> IResult<&str, Literal> {
 }
 
 /// `<application> → (<expression> <expression>*)`
-fn application(i: &str) -> IResult<&str, Expr> {
+fn application(i: &str) -> IResult<&str, Syntax> {
     let (i, (_, a, _, mut b, _)) =
         tuple((open, expression, space0, many0(terminated(expression, space0)), close))(i)?;
 
@@ -323,13 +323,13 @@ fn digit(i: &str) -> IResult<&str, char> {
 /// <vector>           → #(<datum>*)
 /// ```
 #[cfg(test)]
-fn datum(i: &str) -> IResult<&str, Expr> {
+fn datum(i: &str) -> IResult<&str, Syntax> {
     alt((
         (map(tag("()"), |_| Expr::Literal(Nil))),
         (map(boolean, Expr::from)),
         (map(ascii, |c| Expr::from(c as char))),
         (map(number, Expr::from)),
-        (map(identifier, Expr::ident)),
+        (map(identifier, Expr::Identifier)),
         (map(string, Expr::string)),
         list,
     ))(i)
@@ -375,7 +375,7 @@ fn string(i: &str) -> IResult<&str, String> {
 
 /// `<list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>`
 #[cfg(test)]
-fn list(i: &str) -> IResult<&str, Expr> {
+fn list(i: &str) -> IResult<&str, Syntax> {
     let (i, _) = tuple((char('('), space0))(i)?;
     let (i, elems) = separated_list1(space1, datum)(i)?;
     let (i, _) = tuple((space0, char(')')))(i)?;
@@ -456,9 +456,6 @@ mod tests {
 
         // Quoted symbols are not identifiers
         assert_eq!(partial("'woo", String::from("a")), identifier("a'woo"));
-
-        // Internal hack, allow shadowing with .
-        assert_eq!(ok(Identifier(Ident { name: String::from("foo"), index: 4 })), datum("foo.4"));
     }
 
     // #[test]
@@ -469,7 +466,7 @@ mod tests {
     #[test]
     fn data() {
         assert_eq!(ok(Expr::Literal(Nil)), datum("()"));
-        assert_eq!(ok(Expr::ident("one")), datum("one"));
+        assert_eq!(ok(Expr::Identifier(String::from("one"))), datum("one"));
         assert_eq!(ok(42.into()), datum("42"))
     }
 
@@ -483,22 +480,22 @@ mod tests {
 
     #[test]
     fn lists() {
-        assert_eq!(ok(List(vec![Expr::ident("+"), 1.into()])), list("(+ 1)"));
+        assert_eq!(ok(List(vec![Expr::name("+"), 1.into()])), list("(+ 1)"));
 
         assert_eq!(
             ok(List(vec![
                 1.into(),
                 2.into(),
                 3.into(),
-                Expr::ident("a"),
-                Expr::ident("b"),
-                Expr::ident("c")
+                Expr::name("a"),
+                Expr::name("b"),
+                Expr::name("c")
             ])),
             list("(1 2 3 a b c)")
         );
 
         assert_eq!(
-            ok(List(vec![Expr::ident("inc"), List(vec![Expr::ident("inc"), 42.into()]),],)),
+            ok(List(vec![Expr::name("inc"), List(vec![Expr::name("inc"), 42.into()]),],)),
             list("(inc (inc 42))")
         );
 
@@ -509,15 +506,15 @@ mod tests {
     #[test]
     fn binary() {
         assert_eq!(
-            ok(List(vec![Expr::ident("+"), Expr::ident("x"), 1776.into()])),
+            ok(List(vec![Expr::name("+"), Expr::name("x"), 1776.into()])),
             list("(+ x 1776)")
         );
 
         assert_eq!(
             ok(List(vec![
-                Expr::ident("+"),
-                Expr::ident("x"),
-                List(vec![Expr::ident("*"), Expr::ident("a"), Expr::ident("b")],),
+                Expr::name("+"),
+                Expr::name("x"),
+                List(vec![Expr::name("*"), Expr::name("a"), Expr::name("b")],),
             ],)),
             list("(+ x (* a b))")
         );
@@ -543,15 +540,15 @@ mod tests {
         let p2 = "(let ((x 1)) (let ((x 2)) #t) x)";
 
         let e1 = Let {
-            bindings: vec![(Ident::from("x"), Expr::from(1)), (Ident::from("y"), Expr::from(2))],
-            body: vec![List(vec![Expr::ident("+"), (Expr::ident("x")), (Expr::ident("y"))])],
+            bindings: vec![(String::from("x"), Expr::from(1)), (String::from("y"), Expr::from(2))],
+            body: vec![List(vec![Expr::name("+"), (Expr::name("x")), (Expr::name("y"))])],
         };
 
         let e2 = Let {
-            bindings: vec![(Ident::from("x"), Expr::from(1))],
+            bindings: vec![(String::from("x"), Expr::from(1))],
             body: vec![
-                Let { bindings: vec![(Ident::from("x"), Expr::from(2))], body: vec![true.into()] },
-                Expr::ident("x"),
+                Let { bindings: vec![(String::from("x"), Expr::from(2))], body: vec![true.into()] },
+                Expr::name("x"),
             ],
         };
 
@@ -577,12 +574,12 @@ mod tests {
 
         let prog = "(if (zero? x) 1 (* x (f (dec x))))";
         let exp = Cond {
-            pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
+            pred: box List(vec![Expr::name("zero?"), Expr::name("x")]),
             then: box 1.into(),
             alt: Some(box List(vec![
-                Expr::ident("*"),
-                Expr::ident("x"),
-                List(vec![Expr::ident("f"), List(vec![Expr::ident("dec"), Expr::ident("x")])]),
+                Expr::name("*"),
+                Expr::name("x"),
+                List(vec![Expr::name("f"), List(vec![Expr::name("dec"), Expr::name("x")])]),
             ])),
         };
 
@@ -591,14 +588,14 @@ mod tests {
 
     #[test]
     fn application() {
-        assert_eq!(ok(List(vec![Expr::ident("f"), Expr::ident("x")])), super::application("(f x)"));
-        assert_eq!(ok(List(vec![Expr::ident("f")])), super::application("(f)"));
+        assert_eq!(ok(List(vec![Expr::name("f"), Expr::name("x")])), super::application("(f x)"));
+        assert_eq!(ok(List(vec![Expr::name("f")])), super::application("(f)"));
     }
 
     #[test]
     fn quotes() {
         let p = super::program("(symbol=? 'one 'two)");
-        let e = vec![List(vec![Expr::ident("symbol=?"), Expr::symbol("one"), Expr::symbol("two")])];
+        let e = vec![List(vec![Expr::name("symbol=?"), Expr::symbol("one"), Expr::symbol("two")])];
 
         assert_eq!(ok(e), p);
     }
@@ -609,11 +606,11 @@ mod tests {
             (
                 "(define (id x) x)",
                 Define {
-                    name: (Ident::new("id")),
+                    name: (String::from("id")),
                     val: box Lambda(Closure {
                         tail: false,
                         formals: vec!["x".into()],
-                        body: vec![(Expr::ident("x"))],
+                        body: vec![(Expr::name("x"))],
                         free: vec![],
                     }),
                 },
@@ -621,7 +618,7 @@ mod tests {
             (
                 "(define (pi) 42)",
                 Define {
-                    name: (Ident::new("pi")),
+                    name: (String::from("pi")),
                     val: box Lambda(Closure {
                         tail: false,
                         formals: vec![],
@@ -630,18 +627,18 @@ mod tests {
                     }),
                 },
             ),
-            ("(define pi 42)", Define { name: (Ident::new("pi")), val: box Expr::from(42) }),
+            ("(define pi 42)", Define { name: (String::from("pi")), val: box Expr::from(42) }),
             (
                 "(define (add a b) (+ a b))",
                 Define {
-                    name: (Ident::new("add")),
+                    name: (String::from("add")),
                     val: box Lambda(Closure {
                         tail: false,
                         formals: vec!["a".into(), "b".into()],
                         body: vec![Expr::List(vec![
-                            Expr::ident("+"),
-                            Expr::ident("a"),
-                            Expr::ident("b"),
+                            Expr::name("+"),
+                            Expr::name("a"),
+                            Expr::name("b"),
                         ])],
                         free: vec![],
                     }),
@@ -650,15 +647,15 @@ mod tests {
             (
                 "(define (add x y . args) (reduce + 0 args))",
                 Define {
-                    name: (Ident::new("add")),
+                    name: (String::from("add")),
                     val: box Lambda(Closure {
                         tail: false,
                         formals: vec!["x".into(), "y".into(), "args".into()],
                         body: vec![Expr::List(vec![
-                            Expr::ident("reduce"),
-                            Expr::ident("+"),
+                            Expr::name("reduce"),
+                            Expr::name("+"),
                             Expr::from(0),
-                            Expr::ident("args"),
+                            Expr::name("args"),
                         ])],
                         free: vec![],
                     }),
@@ -692,7 +689,7 @@ mod tests {
             tail: false,
             formals: vec!["a".into(), "b".into()],
             free: vec![],
-            body: vec![(Expr::ident("a"))],
+            body: vec![(Expr::name("a"))],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -703,7 +700,7 @@ mod tests {
             tail: false,
             free: vec![],
             formals: vec!["a".into(), "b".into()],
-            body: vec![Expr::List(vec![Expr::ident("+"), Expr::ident("b"), Expr::ident("a")])],
+            body: vec![Expr::List(vec![Expr::name("+"), Expr::name("b"), Expr::name("a")])],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -713,7 +710,7 @@ mod tests {
             tail: false,
             formals: vec!["a".into()],
             free: vec![],
-            body: vec![(Expr::ident("a"))],
+            body: vec![(Expr::name("a"))],
         });
 
         assert_eq!(ok(vec![exp]), program(prog));
@@ -734,12 +731,12 @@ mod tests {
             formals: vec!["x".into()],
             free: vec![],
             body: vec![Cond {
-                pred: box List(vec![Expr::ident("zero?"), Expr::ident("x")]),
+                pred: box List(vec![Expr::name("zero?"), Expr::name("x")]),
                 then: box 1.into(),
                 alt: Some(box List(vec![
-                    Expr::ident("*"),
-                    Expr::ident("x"),
-                    List(vec![Expr::ident("f"), List(vec![Expr::ident("dec"), Expr::ident("x")])]),
+                    Expr::name("*"),
+                    Expr::name("x"),
+                    List(vec![Expr::name("f"), List(vec![Expr::name("dec"), Expr::name("x")])]),
                 ])),
             }],
         });
@@ -750,7 +747,7 @@ mod tests {
 
 /// Parse a single expression for testing, return or panic
 #[cfg(test)]
-pub fn parse1(i: &str) -> Expr {
+pub fn parse1(i: &str) -> Syntax {
     match form(i) {
         Ok((_rest, e)) => e,
         Err(e) => panic!("Failed to parse `{}`: {:?}", i, e),
@@ -758,7 +755,7 @@ pub fn parse1(i: &str) -> Expr {
 }
 
 /// Parse the whole program
-pub fn parse<'a>(i: &'a str) -> Result<Vec<Expr>, Error<'a>> {
+pub fn parse<'a>(i: &'a str) -> Result<Vec<Syntax>, Error<'a>> {
     match program(i) {
         Ok((_rest, expressions)) => Ok(expressions),
         Err(e) => Err(Error::Parser(e)),
