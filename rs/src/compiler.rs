@@ -249,7 +249,7 @@ pub mod emit {
     #[allow(clippy::redundant_pattern)]
     pub fn eval(s: &mut State, prog: &Expr) -> ASM {
         match prog {
-            Literal(Identifier(i)) => match s.get(&i) {
+            Identifier(i) => match s.get(&i) {
                 Some(index) => x86::mov(RAX.into(), index.clone()).into(),
                 None => panic!("Undefined variable {}", i.name),
             },
@@ -264,7 +264,7 @@ pub mod emit {
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
-                [Literal(Identifier(i @ Ident { name, .. })), args @ ..] => {
+                [Identifier(i @ Ident { name, .. }), args @ ..] => {
                     if s.functions.contains(&i) {
                         lambda::call(s, &i, &args)
                     } else if let Some(x) = primitives::call(s, &name, args) {

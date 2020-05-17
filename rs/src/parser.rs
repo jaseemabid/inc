@@ -458,10 +458,7 @@ mod tests {
         assert_eq!(partial("'woo", String::from("a")), identifier("a'woo"));
 
         // Internal hack, allow shadowing with .
-        assert_eq!(
-            ok(Literal(Identifier(Ident { name: String::from("foo"), index: 4 }))),
-            datum("foo.4")
-        );
+        assert_eq!(ok(Identifier(Ident { name: String::from("foo"), index: 4 })), datum("foo.4"));
     }
 
     // #[test]

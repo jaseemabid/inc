@@ -38,10 +38,10 @@ pub fn lift(s: &mut State, prog: Vec<Expr>) -> Vec<Expr> {
 
 fn mangle(env: &HashMap<&str, i64>, prog: Expr) -> Expr {
     match prog {
-        Literal(Identifier(ident)) => Literal(Identifier(match env.get(ident.name.as_str()) {
+        Identifier(ident) => Identifier(match env.get(ident.name.as_str()) {
             Some(n) => Ident { name: ident.name.clone(), index: *n },
             None => ident,
-        })),
+        }),
 
         Let { bindings, body } => mangle1(env, bindings, body),
 
@@ -212,7 +212,7 @@ fn anf1(prog: Expr) -> Expr {
                         if e.anf() {
                             e.clone()
                         } else {
-                            Literal(Identifier(Ident::new(format!("_{}", i))))
+                            Identifier(Ident::new(format!("_{}", i)))
                         }
                     })
                     .collect();
@@ -246,7 +246,7 @@ pub fn tco(exprs: Vec<Expr>) -> Vec<Expr> {
         // Check if the tail call is a list and the first elem is an identifier
         match last {
             Some(List(l)) => match l.first() {
-                Some(Literal(Identifier(id))) => id == name,
+                Some(Identifier(id)) => id == name,
                 _ => false,
             },
             _ => false,

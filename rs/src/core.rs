@@ -6,7 +6,10 @@ use std::fmt;
 /// Abstract Syntax Tree for a single expression
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
+    // Constant expressions
     Literal(Literal),
+    // Scheme Identifiers
+    Identifier(Ident),
     // Since Rust needs to know the size of the Expr type upfront, we need an
     // indirection here with `Vec<>` for recursive types. In this context, Vec
     // is just a convenient way to have a `Box<[Expr]>`
@@ -40,8 +43,6 @@ pub enum Literal {
     Char(u8),
     // UTF-8 Strings
     Str(String),
-    // Scheme Identifiers
-    Identifier(Ident),
     // Symbols
     Symbol(String),
 }
@@ -108,7 +109,7 @@ impl Expr {
     }
 
     pub fn ident<S: Into<String>>(name: S) -> Self {
-        Literal(Literal::Identifier(Ident::from(name)))
+        Self::Identifier(Ident::from(name))
     }
 }
 
@@ -142,7 +143,6 @@ impl fmt::Display for Literal {
             }
 
             Self::Str(s) => write!(f, "\"{}\"", s),
-            Self::Identifier(Ident { name, index }) => write!(f, "{}.{}", name, index),
             Self::Symbol(i) => write!(f, "'{}", i),
         }
     }
@@ -152,6 +152,7 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Literal(l) => write!(f, "{}", l),
+            Identifier(Ident { name, index }) => write!(f, "{}.{}", name, index),
             List(l) => {
                 write!(f, "(")?;
                 let mut l = l.iter().peekable();
