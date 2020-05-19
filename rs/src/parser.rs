@@ -263,16 +263,23 @@ fn application(i: &str) -> IResult<&str, Syntax> {
 /// <letter>     → a | b | ... | z
 /// <digit>      → 0 | 1 | ... | 9
 /// ```
+///
+/// The parser extends the grammar for identifiers like `fn::{let 1}::x`
 fn identifier(i: &str) -> IResult<&str, String> {
+    let subsequent_with_space = |i| alt((initial, digit, symbol, one_of(".+- ")))(i);
+
     alt((
         value(String::from("+"), tag("+")),
         value(String::from("-"), tag("-")),
         value(String::from("..."), tag("...")),
-        map(tuple((initial, many0(subsequent))), |(i, s)| {
-            // Convert a vector of chars to string
-            // https://doc.rust-lang.org/stable/core/iter/trait.Iterator.html#method.collect
-            format!("{}{}", i, s.iter().collect::<String>())
+        map(tuple((initial, many0(subsequent), opt(identifier))), |(i, s, rest)| match rest {
+            Some(more) => format!("{}{}{}", i, s.iter().collect::<String>(), more),
+            None => format!("{}{}", i, s.iter().collect::<String>()),
         }),
+        map(
+            tuple((tag("{"), tuple((initial, many0(subsequent_with_space))), tag("}"), identifier)),
+            |(_, (i, s), _, again)| format!("{{{}{}}}{}", i, s.iter().collect::<String>(), again),
+        ),
     ))(i)
 }
 
@@ -456,6 +463,14 @@ mod tests {
 
         // Quoted symbols are not identifiers
         assert_eq!(partial("'woo", String::from("a")), identifier("a'woo"));
+
+        // Allow namespaced identifiers for tests
+        assert_eq!(ok(String::from("x::y")), identifier("x::y"));
+        assert_eq!(ok(String::from("{let 0}::y")), identifier("{let 0}::y"));
+        assert_eq!(
+            ok(String::from("fn::{let 0}::{closure}::x")),
+            identifier("fn::{let 0}::{closure}::x")
+        );
     }
 
     // #[test]
