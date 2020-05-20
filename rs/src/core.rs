@@ -1,9 +1,8 @@
 //! Core types shared by most of the program
-use self::Expr::*;
 use colored::Colorize;
 use std::{clone::Clone, fmt};
 
-/// Parameterized Abstract Syntax Tree for Scheme
+/// Parameterized Abstract Syntax Tree
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr<T: Clone> {
     Literal(Literal),
@@ -98,17 +97,17 @@ impl<T: Clone> Expr<T> {
     /// Checks if an expression is in [A-Normal Form](https://en.wikipedia.org/wiki/A-normal_form)
     pub fn anf(&self) -> bool {
         match self {
-            Literal(..) => true,
+            Expr::Literal(..) => true,
             _ => false,
         }
     }
 
     pub fn symbol<S: Into<String>>(name: S) -> Self {
-        Literal(Literal::Symbol(name.into()))
+        Expr::Literal(Literal::Symbol(name.into()))
     }
 
     pub fn string<S: Into<String>>(name: S) -> Self {
-        Literal(Literal::Str(name.into()))
+        Expr::Literal(Literal::Str(name.into()))
     }
 }
 
@@ -155,9 +154,9 @@ impl fmt::Display for Literal {
 impl<T: Clone + fmt::Display> fmt::Display for Expr<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Literal(l) => write!(f, "{}", l),
-            Identifier(i) => write!(f, "{}", i),
-            List(l) => {
+            Expr::Literal(l) => write!(f, "{}", l),
+            Expr::Identifier(i) => write!(f, "{}", i),
+            Expr::List(l) => {
                 write!(f, "(")?;
                 let mut l = l.iter().peekable();
                 while let Some(elem) = l.next() {
@@ -172,7 +171,7 @@ impl<T: Clone + fmt::Display> fmt::Display for Expr<T> {
 
             // TODO: Pretty print ports differently from other vectors
             // Example: #<input/output port stdin/out> | #<output port /tmp/foo.txt>
-            Vector(l) => {
+            Expr::Vector(l) => {
                 write!(f, "[")?;
                 let mut l = l.iter().peekable();
                 while let Some(elem) = l.next() {
@@ -184,18 +183,18 @@ impl<T: Clone + fmt::Display> fmt::Display for Expr<T> {
                 }
                 write!(f, "]")
             }
-            Cond { pred, then, alt } => match alt {
+            Expr::Cond { pred, then, alt } => match alt {
                 None => write!(f, "(if {} {})", pred, then),
                 Some(t) => write!(f, "(if {} {} {})", pred, then, t),
             },
-            Let { bindings, body } => {
+            Expr::Let { bindings, body } => {
                 write!(f, "(let (")?;
                 bindings.iter().for_each(|(a, b)| write!(f, "({} {})", a, b).unwrap());
                 write!(f, ") ")?;
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
-            Lambda(Closure { formals, body, tail, .. }) => {
+            Expr::Lambda(Closure { formals, body, tail, .. }) => {
                 if *tail {
                     write!(f, "(^λ^ (")?;
                 } else {
@@ -207,7 +206,7 @@ impl<T: Clone + fmt::Display> fmt::Display for Expr<T> {
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
-            Define { name, val } => write!(f, "(define {} {})", name, val),
+            Expr::Define { name, val } => write!(f, "(define {} {})", name, val),
         }
     }
 }
