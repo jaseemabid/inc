@@ -136,28 +136,28 @@ pub mod state {
             assert_eq!(e.0.len(), 1);
 
             // default global scope
-            e.set(Ident::from("x"), Reference::from(-8));
-            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-8)));
+            e.set(Ident::new("x"), Reference::from(-8));
+            assert_eq!(e.get(&Ident::new("x")), Some(&Reference::from(-8)));
 
             // overwrite in current scope
-            e.set(Ident::from("x"), Reference::from(-16));
-            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-16)));
+            e.set(Ident::new("x"), Reference::from(-16));
+            assert_eq!(e.get(&Ident::new("x")), Some(&Reference::from(-16)));
 
             e.enter();
             assert_eq!(e.0.len(), 2);
             // read variables from parent scope
-            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-16)));
+            assert_eq!(e.get(&Ident::new("x")), Some(&Reference::from(-16)));
 
-            e.set(Ident::from("y"), Reference::from(-24));
+            e.set(Ident::new("y"), Reference::from(-24));
             // local variable shadows global
-            e.set(Ident::from("x"), Reference::from(-32));
-            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-32)));
+            e.set(Ident::new("x"), Reference::from(-32));
+            assert_eq!(e.get(&Ident::new("x")), Some(&Reference::from(-32)));
 
             e.leave();
 
             assert_eq!(e.0.len(), 1);
-            assert_eq!(e.get(&Ident::from("y")), None);
-            assert_eq!(e.get(&Ident::from("x")), Some(&Reference::from(-16)));
+            assert_eq!(e.get(&Ident::new("y")), None);
+            assert_eq!(e.get(&Ident::new("x")), Some(&Reference::from(-16)));
         }
     }
 }
@@ -247,7 +247,7 @@ pub mod emit {
         match prog {
             Identifier(i) => match s.get(&i) {
                 Some(index) => x86::mov(RAX.into(), index.clone()).into(),
-                None => panic!("Undefined variable {}", i.name),
+                None => panic!("Undefined variable {}", i),
             },
 
             // Find the symbol index and return and reference in RAX
@@ -260,12 +260,12 @@ pub mod emit {
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
-                [Identifier(i @ Ident { name, .. }), args @ ..] => {
-                    if s.functions.contains(&i) {
-                        lambda::call(s, &i, &args)
+                [Identifier(name), args @ ..] => {
+                    if s.functions.contains(&name) {
+                        lambda::call(s, &name, &args)
                     } else if let Some(x) = primitives::call(s, &name, args) {
                         x
-                    } else if rt::defined(name) {
+                    } else if rt::defined(&name) {
                         ffi::call(s, name, &args)
                     } else {
                         panic!("Unknown function {} called with args: {:?}", name, &args)

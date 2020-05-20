@@ -16,12 +16,12 @@ pub enum Expr<T: Clone> {
     Lambda(Closure<T>),
 }
 
-/// Syntax representation or Stage 0 of the AST
+/// Syntax representation of Scheme
 ///
-/// Parser generates one of these values
+/// Parser returns a `Syntax` as one of the first steps.
 pub type Syntax = Expr<String>;
 
-/// Core AST or Stage 1+
+/// Intermediate AST
 pub type Core = Expr<Ident>;
 
 /// Literal types of Scheme
@@ -45,49 +45,17 @@ pub enum Literal {
     Symbol(String),
 }
 
-/// Ident is a refinement type for an identifier
-// Rather than rely on a symbol table to store the metadata of an
-// identifier, store them inline within the AST.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+/// Identifiers with metadata and namespaces
 pub struct Ident {
-    //  User defined name of the variable
-    pub name: String,
-    // Disambiguate the same name. Eg, a0, a1, a2
-    pub index: i64,
+    name: Vec<String>,
 }
 
-impl Ident {
-    pub fn new<S: Into<String>>(name: S) -> Self {
-        Self { name: name.into(), index: 0 }
-    }
-
-    pub fn inc(self: &Self) -> Self {
-        Self { name: self.name.clone(), index: self.index + 1 }
-    }
-
-    pub fn from<S: Into<String>>(name: S) -> Self {
-        match name.into().split('.').collect::<Vec<&str>>().as_slice() {
-            [name, index] => {
-                Self { name: (*name).to_string(), index: index.parse::<i64>().unwrap() }
-            }
-            [name] => Self { name: (*name).to_string(), index: 0 },
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn expr<S: Into<String>>(name: S) -> Expr<Ident> {
-        Expr::Identifier(Ident::from(name))
-    }
-}
-
-/// Closure is a refinement type for Expression specialized for lambdas
+/// Closures are code blocks with their environment captured
 #[derive(Clone, Debug, PartialEq)]
 pub struct Closure<T: Clone> {
-    // Formal arguments to the function, filled in by the parser
-    pub formals: Vec<String>,
-    // Free variables, added post closure conversion
-    pub free: Vec<String>,
-    // A body is a list of expressions evaluated in order
+    pub formals: Vec<T>,
+    pub free: Vec<T>,
     pub body: Vec<Expr<T>>,
     // Is this a tail call?
     pub tail: bool,
@@ -117,14 +85,50 @@ impl Expr<String> {
     }
 }
 
+impl Ident {
+    pub const fn empty() -> Self {
+        Self { name: vec![] }
+    }
+
+    pub fn new<S: Into<String>>(name: S) -> Self {
+        Self { name: name.into().split("::").map(|s| s.into()).collect::<Vec<_>>() }
+    }
+
+    /// Create a new identifier extending an existing environment
+    ///
+    /// ```
+    /// # use inc::core::Ident;
+    /// let base = Ident::new("top");
+    /// assert_eq!(Ident::new("top::fn"), base.extend("fn"))
+    /// ```
+    pub fn extend<S: Into<String>>(&self, s: S) -> Self {
+        let mut name = self.name.clone();
+        name.push(s.into());
+        Self { name }
+    }
+
+    pub fn expr<S: Into<String>>(name: S) -> Expr<Ident> {
+        Expr::Identifier(Ident::new(name))
+    }
+
+    /// Short names
+    pub fn short(&self) -> String {
+        self.name.last().unwrap().to_string()
+    }
+
+    /// Mangled names for code generation
+    /// TODO: This is obviously wrong
+    pub fn mangle(&self) -> String {
+        self.name.last().unwrap().to_string()
+    }
+}
+
 impl fmt::Display for Ident {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Ident { name, index } = self;
-        if *index == 0 {
-            write!(f, "{}", name)
-        } else {
-            write!(f, "{}.{}", name, index)
-        }
+        let mut result = self.name.iter().fold(String::new(), |s, arg| s + &arg + " ");
+        result.pop();
+
+        write!(f, "{}", result)
     }
 }
 

@@ -15,12 +15,13 @@
 use crate::{
     compiler::{emit::eval, state::State},
     core::Core,
+    core::Ident,
     immediate,
     x86::{self, Reference::*, Register::*, ASM, WORDSIZE},
 };
 
 /// Call a foreign function defined in Rust/C
-pub fn call(s: &mut State, name: &str, args: &[Core]) -> ASM {
+pub fn call(s: &mut State, name: &Ident, args: &[Core]) -> ASM {
     let mut asm = ASM(vec![]);
 
     if args.len() > 6 {
@@ -49,7 +50,7 @@ pub fn call(s: &mut State, name: &str, args: &[Core]) -> ASM {
         format!("_{}", name.replace("-", "_").replace("=?", "_eq"))
     }
 
-    let name = rename(name);
+    let name = rename(&name.mangle());
 
     // See docs in `lambda:call` for details on how this works.
     if s.si != -WORDSIZE {

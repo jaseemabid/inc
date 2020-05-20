@@ -16,14 +16,14 @@ use crate::{
         emit::{eval, mask},
         state::State,
     },
-    core::{Literal::*, *},
+    core::{Ident, Literal::*, *},
     immediate, strings,
     x86::{self, Reference::*, Register::*, *},
 };
 
 /// Call compiler primitive by name
-pub fn call(s: &mut State, fname: &str, args: &[Core]) -> Option<ASM> {
-    match (fname, args) {
+pub fn call(s: &mut State, fname: &Ident, args: &[Core]) -> Option<ASM> {
+    match (fname.short().as_str(), args) {
         ("%", [x, y]) => Some(remainder(s, x, y)),
         ("*", [x, y]) => Some(mul(s, x, y)),
         ("+", [x, y]) => Some(plus(s, x, y)),

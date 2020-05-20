@@ -74,10 +74,7 @@ fn emit1(s: &mut State, name: &Ident, code: &Closure<Ident>) -> ASM {
     s.enter();
 
     for (i, arg) in code.formals.iter().enumerate() {
-        s.set(
-            Ident::new(arg),
-            Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into(),
-        );
+        s.set(arg.clone(), Relative { register: RBP, offset: -(i as i64 + 1) * WORDSIZE }.into());
     }
 
     for b in &code.body {

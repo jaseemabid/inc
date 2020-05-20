@@ -24,84 +24,98 @@ use {std::clone::Clone, std::collections::HashMap};
 pub fn rename(prog: Vec<Syntax>) -> Vec<Core> {
     // TODO: This isn't right, same state should be used for all sub expressions.
     // Test for 2 different functions with the same name.
-    prog.into_iter().map(|e| mangle(&HashMap::<&str, i64>::new(), e)).collect()
+
+    prog.into_iter().map(|e| rename1(&HashMap::new(), &Ident::empty(), 0, e)).collect()
 }
 
-fn mangle(env: &HashMap<&str, i64>, prog: Syntax) -> Core {
+/// Rename a single expression
+///
+/// Env maps the current environment, base is the identifier for the current
+/// environment that is used to derive all new names and index refers to the
+/// free index to name anonymous closures and let bindings.
+fn rename1(env: &HashMap<&str, Ident>, base: &Ident, index: u8, prog: Syntax) -> Core {
     match prog {
+        // If an identifier is defined already, refer to it, otherwise create a
+        // new one in the top level environment since its unbound.
         Identifier(s) => match env.get(s.as_str()) {
-            Some(n) => Expr::Identifier(Ident { name: s.to_string(), index: *n }),
+            Some(n) => Expr::Identifier(n.clone()),
             None => Ident::expr(s),
         },
 
-        Let { bindings, body } => mangle_let(env, bindings, body),
+        Let { bindings, body } => {
+            let base = base.extend(format!("{{let {}}}", index));
 
-        List(list) => List(list.into_iter().map(|l| mangle(env, l)).collect()),
+            // Collect all the names about to be bound for evaluating body
+            let mut all = env.clone();
+            for (name, _val) in bindings.iter() {
+                all.insert(name.as_str(), base.extend(name));
+            }
+
+            // A sub expression in let binding is evaluated with the complete
+            // environment including the one being defined only if the subexpresison
+            // captures the closure with another let or lambda, otherwise evaluate with
+            // only the rest of the bindings.
+            Let {
+                bindings: bindings
+                    .iter()
+                    .map(|(current, value)| {
+                        // Collect all the names excluding the one being defined now
+                        let mut rest = env.clone();
+                        for (name, _) in bindings.iter() {
+                            if name != current {
+                                rest.insert(name.as_str(), base.extend(name));
+                            }
+                        }
+
+                        let value = match value {
+                            Let { .. } => rename1(&all, &base, index + 1, value.clone()),
+                            Lambda(c) => {
+                                let base = base.extend(current);
+                                rename1(&all, &base, index + 1, Lambda(c.clone()))
+                            }
+                            _ => rename1(&rest, &base, index + 1, value.clone()),
+                        };
+
+                        let ident = all.get(current.as_str()).unwrap().clone();
+
+                        (ident, value)
+                    })
+                    .collect(),
+
+                body: body.into_iter().map(|b| rename1(&all, &base, index + 1, b)).collect(),
+            }
+        }
+
+        List(list) => List(list.into_iter().map(|l| rename1(env, base, index, l)).collect()),
 
         Cond { pred, then, alt } => Cond {
-            pred: box mangle(env, *pred),
-            then: box mangle(env, *then),
-            alt: alt.map(|u| box mangle(env, *u)),
+            pred: box rename1(env, base, index, *pred),
+            then: box rename1(env, base, index, *then),
+            alt: alt.map(|u| box rename1(env, base, index, *u)),
         },
 
-        Lambda(Closure { formals, free, body, tail }) => Lambda(Closure {
-            formals,
-            free,
-            body: body.into_iter().map(|b| mangle(env, b)).collect(),
-            tail,
-        }),
+        Lambda(Closure { formals, free, body, tail }) => {
+            let mut env = env.clone();
+            for arg in formals.iter() {
+                env.insert(arg, base.extend(arg));
+            }
 
-        // XXX; This is wrong, but some test is gonna catch this!
-        Define { name, val } => Define { name: Ident::from(name), val: box mangle(env, *val) },
+            Lambda(Closure {
+                formals: formals.iter().map(|arg| base.extend(arg)).collect(),
+                free: free.into_iter().map(|arg| base.extend(arg)).collect(),
+                body: body.into_iter().map(|b| rename1(&env, base, 0, b)).collect(),
+                tail,
+            })
+        }
 
-        Vector(list) => Vector(list.into_iter().map(|l| mangle(env, l)).collect()),
+        Define { name, val } => {
+            Define { name: base.extend(&name), val: box rename1(env, &base.extend(&name), 0, *val) }
+        }
+
+        Vector(list) => Vector(list.into_iter().map(|l| rename1(env, base, index, l)).collect()),
 
         // All literals and constants evaluate to itself
         Literal(v) => Literal(v),
-    }
-}
-
-fn mangle_let(
-    env: &HashMap<&str, i64>,
-    bindings: Vec<(String, Syntax)>,
-    body: Vec<Syntax>,
-) -> Core {
-    // Collect all the names about to be bound for evaluating body
-    let mut all = env.clone();
-    for (name, _index) in bindings.iter() {
-        all.entry(name.as_str()).and_modify(|e| *e += 1).or_insert(0);
-    }
-
-    // A sub expression in let binding is evaluated with the complete
-    // environment including the one being defined only if the subexpresison
-    // captures the closure with another let or lambda, otherwise evaluate with
-    // only the rest of the bindings.
-    Let {
-        bindings: bindings
-            .iter()
-            .map(|(current, value)| {
-                // Collect all the names excluding the one being defined now
-                let mut rest = env.clone();
-                for (name, _) in bindings.iter() {
-                    if name != current {
-                        rest.entry(name.as_str()).and_modify(|e| *e += 1).or_insert(0);
-                    }
-                }
-
-                let value = match value {
-                    Let { .. } => mangle(&all, value.clone()),
-                    Lambda(c) => mangle(&all, Lambda(c.clone())),
-                    _ => mangle(&rest, value.clone()),
-                };
-
-                let ident =
-                    Ident { index: *all.get(current.as_str()).unwrap(), name: current.to_string() };
-
-                (ident, value)
-            })
-            .collect(),
-
-        body: body.into_iter().map(|b| mangle(&all, b)).collect(),
     }
 }
 
@@ -321,58 +335,89 @@ mod tests {
     use crate::parser::parse1;
     use pretty_assertions::assert_eq;
 
-    #[test]
-    fn shadow1() {
-        let x = parse1("(let ((x 1)) (let ((x 2)) (+ x x)))");
+    fn rename(prog: Syntax) -> Core {
+        super::rename1(&HashMap::new(), &Ident::empty(), 0, prog)
+    }
 
-        let y = Let {
-            bindings: vec![(Ident::from("x.0"), Expr::from(1))],
-            body: vec![Let {
-                bindings: vec![(Ident::from("x.1"), Expr::from(2))],
-                body: vec![List(vec![Ident::expr("+"), Ident::expr("x.1"), Ident::expr("x.1")])],
-            }],
-        };
+    /// Mock rename, which blindly converts Strings to Identifiers
+    fn mock(prog: Syntax) -> Core {
+        match prog {
+            Identifier(s) => Expr::Identifier(Ident::new(s)),
 
-        assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
+            Let { bindings, body } => Let {
+                bindings: bindings
+                    .iter()
+                    .map(|(name, value)| (Ident::new(name), mock(value.clone())))
+                    .collect(),
+
+                body: body.into_iter().map(|b| mock(b)).collect(),
+            },
+
+            List(list) => List(list.into_iter().map(mock).collect()),
+
+            Cond { pred, then, alt } => Cond {
+                pred: box mock(*pred),
+                then: box mock(*then),
+                alt: alt.map(|u| box mock(*u)),
+            },
+
+            Lambda(Closure { formals, free, body, tail }) => Lambda(Closure {
+                formals: formals.into_iter().map(Ident::new).collect(),
+                free: free.into_iter().map(Ident::new).collect(),
+                body: body.into_iter().map(mock).collect(),
+                tail,
+            }),
+
+            Define { name, val } => Define { name: Ident::new(name), val: box mock(*val) },
+
+            Vector(list) => Vector(list.into_iter().map(mock).collect()),
+
+            // All literals and constants evaluate to itself
+            Literal(v) => Literal(v),
+        }
     }
 
     #[test]
-    fn shadow2() {
-        let x = parse1("(let ((t (cons 1 2))) (let ((t t)) (let ((t t)) (let ((t t)) t))))");
+    fn nest() {
+        let x = rename(parse1(
+            "(let ((x 1)
+                   (y 2))
+               (let ((z 3))
+                 (+ x y z)))",
+        ));
 
-        let y = Let {
-            bindings: vec![(
-                Ident::from("t.0"),
-                List(vec![Ident::expr("cons"), Literal(Number(1)), Literal(Number(2))]),
-            )],
-            body: vec![Let {
-                bindings: vec![(Ident::from("t.1"), Ident::expr("t.0"))],
-                body: vec![Let {
-                    bindings: vec![(Ident::from("t.2"), Ident::expr("t.1"))],
-                    body: vec![Let {
-                        bindings: vec![(Ident::from("t.3"), Ident::expr("t.2"))],
-                        body: vec![Ident::expr("t.3")],
-                    }],
-                }],
-            }],
-        };
-
-        assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
+        let y = mock(parse1(
+            "(let (({let 0}::x 1)
+                  ({let 0}::y 2))
+               (let (({let 0}::{let 1}::z 3))
+                 (+ {let 0}::x {let 0}::y {let 0}::{let 1}::z))))",
+        ));
+        assert_eq!(x, y);
     }
 
     #[test]
-    fn alias() {
-        let x = parse1("(let ((x 1)) (let ((x x)) (+ x x)))");
+    fn closure() {
+        let x = rename(parse1(
+            "(let ((add (lambda (x y) (+ x y))))
+               (add 10 20))",
+        ));
 
-        let y = Let {
-            bindings: vec![(Ident::from("x.0"), Expr::from(1))],
-            body: vec![Let {
-                bindings: vec![(Ident::from("x.1"), Ident::expr("x.0"))],
-                body: vec![List(vec![Ident::expr("+"), Ident::expr("x.1"), Ident::expr("x.1")])],
-            }],
-        };
+        let y = mock(parse1(
+            "(let (({let 0}::add (lambda ({let 0}::add::x
+                                          {let 0}::add::y)
+                                              (+ {let 0}::add::x {let 0}::add::y))))
+                                   ({let 0}::add 10 20))",
+        ));
 
-        assert_eq!(y, mangle(&HashMap::<&str, i64>::new(), x));
+        assert_eq!(x, y);
+    }
+
+    #[test]
+    fn function() {
+        let x = rename(parse1("(define (add x y) (+ x y))"));
+        let y = mock(parse1("(define (add add::x add::y) (+ add::x add::y))"));
+
+        assert_eq!(x, y);
     }
 
     #[test]
@@ -380,176 +425,86 @@ mod tests {
         let x = parse1("(f (+ 1 2) 7)");
         let y = Let {
             bindings: vec![(
-                Ident::from("_0"),
+                Ident::new("_0"),
                 List(vec![Ident::expr("+"), Literal(Number(1)), Literal(Number(2))]),
             )],
             body: vec![List(vec![Ident::expr("f"), Ident::expr("_0"), Literal(Number(7))])],
         };
 
-        assert_eq!(y, anf1(mangle(&HashMap::<&str, i64>::new(), x)));
+        assert_eq!(y, anf1(rename(x)));
     }
 
     #[test]
     fn letrec() {
-        let expr = mangle(
-            &HashMap::<&str, i64>::new(),
-            parse1(
-                "(let ((f (lambda (x) (g x x)))
-                       (g (lambda (x y) (+ x y))))
-                   (f 12))",
-            ),
-        );
+        let x = rename(parse1(
+            "(let ((f (lambda (x) (g x x)))
+                   (g (lambda (x y) (+ x y))))
+               (f 12))",
+        ));
 
-        match expr {
-            Let { bindings, body } => {
-                assert_eq!(bindings[0].0, Ident::new("f"));
-                assert_eq!(
-                    bindings[0].1,
-                    Lambda(Closure {
-                        formals: vec!["x".into()],
-                        body: vec![List(vec![
-                            Ident::expr("g"),
-                            Ident::expr("x"),
-                            Ident::expr("x")
-                        ])],
-                        free: vec![],
-                        tail: false
-                    })
-                );
+        let y = mock(parse1(
+            "(let (({let 0}::f (lambda ({let 0}::f::x) ({let 0}::g {let 0}::f::x {let 0}::f::x)))
+                   ({let 0}::g (lambda ({let 0}::g::x {let 0}::g::y) (+ {let 0}::g::x {let 0}::g::y))))
+               ({let 0}::f 12))",
+        ));
 
-                assert_eq!(bindings[1].0, Ident::new("g"));
-                assert_eq!(
-                    bindings[1].1,
-                    Lambda(Closure {
-                        formals: vec!["x".to_string(), "y".to_string()],
-                        body: vec![List(vec![
-                            Ident::expr("+"),
-                            Ident::expr("x"),
-                            Ident::expr("y")
-                        ])],
-                        free: vec![],
-                        tail: false
-                    })
-                );
-
-                assert_eq!(body, vec![List(vec![Ident::expr("f"), Expr::from(12)])]);
-            }
-            _ => panic!(),
-        }
+        assert_eq!(x, y);
     }
 
     #[test]
     fn recursive() {
-        let x = Let {
-            bindings: vec![(
-                Ident::new("f"),
-                Lambda(Closure {
-                    formals: vec!["x".into()],
-                    free: vec![],
-                    body: vec![Cond {
-                        pred: box List(vec![Ident::expr("zero?"), Ident::expr("x")]),
-                        then: box Expr::from(1),
-                        alt: Some(box List(vec![
-                            Ident::expr("*"),
-                            Ident::expr("x"),
-                            List(vec![
-                                Ident::expr("f"),
-                                List(vec![Ident::expr("dec"), Ident::expr("x")]),
-                            ]),
-                        ])),
-                    }],
-                    tail: false,
-                }),
-            )],
-            body: vec![List(vec![Ident::expr("f"), Expr::from(5)])],
-        };
-
-        let y = parse1(
+        let x = rename(parse1(
             "(let ((f (lambda (x)
-                        (if (zero? x)
-                          1
-                          (* x (f (dec x))))))) (f 5))",
-        );
+               (if (zero? x)
+                 1
+                 (* x (f (dec x))))))) (f 5))",
+        ));
 
-        assert_eq!(x, mangle(&HashMap::<&str, i64>::new(), y))
+        let y = mock(parse1(
+            "(let (({let 0}::f (lambda ({let 0}::f::x)
+               (if (zero? {let 0}::f::x)
+                 1
+                 (* {let 0}::f::x ({let 0}::f (dec {let 0}::f::x))))))) ({let 0}::f 5))",
+        ));
+
+        assert_eq!(x, y)
     }
 
+    /// OMG! I'm so happy to finally see these tests this way! Took me years! 😢
     #[test]
     fn lift_simple() {
         let prog = r"(let ((id (lambda (x) x))) (id 42))";
-        let expr = lift1(&mut Default::default(), mangle(&Default::default(), parse1(prog)));
+        let expr = lift1(&mut Default::default(), rename(parse1(prog)));
 
-        assert_eq!(
-            expr[0],
-            Define {
-                name: Ident::from("id"),
-                val: box Lambda(Closure {
-                    formals: vec!["x".into()],
-                    body: vec![Ident::expr("x")],
-                    free: vec![],
-                    tail: false
-                })
-            }
-        );
-
-        assert_eq!(
-            expr[1],
-            Let { bindings: vec![], body: vec![List(vec![Ident::expr("id"), Expr::from(42)])] }
-        );
+        assert_eq!(expr[0], mock(parse1("(define ({let 0}::id {let 0}::id::x ) {let 0}::id::x)")));
+        assert_eq!(expr[1], mock(parse1("(let () ({let 0}::id 42))")));
     }
 
     #[test]
     fn lift_recursive() {
         let prog = r"(let ((even (lambda (x) (if (zero? x) #t (odd (dec x)))))
                            (odd  (lambda (x) (if (zero? x) #f (even (dec x))))))
-                       (e 25)))";
+                       (even 25)))";
 
-        let expr = lift1(&mut Default::default(), mangle(&Default::default(), parse1(prog)));
+        let expr = lift1(&mut Default::default(), rename(parse1(prog)));
 
         assert_eq!(
             expr[0],
-            Define {
-                name: Ident::from("even"),
-                val: box Lambda(Closure {
-                    tail: false,
-                    formals: vec!["x".into()],
-                    free: vec![],
-                    body: vec![Cond {
-                        pred: box List(vec![Ident::expr("zero?"), Ident::expr("x")]),
-                        then: box Expr::from(true),
-                        alt: Some(box List(vec![
-                            Ident::expr("odd"),
-                            List(vec![Ident::expr("dec"), Ident::expr("x")])
-                        ]))
-                    }]
-                })
-            }
+            mock(parse1(
+                "(define ({let 0}::even {let 0}::even::x)
+                   (if (zero? {let 0}::even::x) #t ({let 0}::odd (dec {let 0}::even::x))))"
+            ))
         );
 
         assert_eq!(
             expr[1],
-            Define {
-                name: Ident::from("odd"),
-                val: box Lambda(Closure {
-                    tail: false,
-                    formals: vec!["x".into()],
-                    free: vec![],
-                    body: vec![Cond {
-                        pred: box List(vec![Ident::expr("zero?"), Ident::expr("x")]),
-                        then: box Expr::from(false),
-                        alt: Some(box List(vec![
-                            Ident::expr("even"),
-                            List(vec![Ident::expr("dec"), Ident::expr("x")])
-                        ]))
-                    }]
-                })
-            }
+            mock(parse1(
+                "(define ({let 0}::odd {let 0}::odd::x)
+                   (if (zero? {let 0}::odd::x) #f ({let 0}::even (dec {let 0}::odd::x))))"
+            ))
         );
 
-        assert_eq!(
-            expr[2],
-            Let { bindings: vec![], body: vec![List(vec![Ident::expr("e"), Expr::from(25)])] }
-        );
+        assert_eq!(expr[2], mock(parse1("(let () ({let 0}::even 25))")));
     }
 
     #[test]
@@ -561,7 +516,7 @@ mod tests {
              (factorial 42 1))";
 
         let expr = parse1(prog);
-        let expr = mangle(&HashMap::<&str, i64>::new(), expr);
+        let expr = rename(expr);
         let exprs = lift1(&mut Default::default(), expr);
 
         match &exprs[0] {

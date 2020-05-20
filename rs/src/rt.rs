@@ -8,6 +8,7 @@ use crate::{
     core::{
         Core,
         Expr::{self, *},
+        Ident,
         Literal::*,
     },
     immediate::{self, *},
@@ -56,7 +57,7 @@ impl Object {
 }
 
 /// Checks if a function is defined in the built in runtime
-pub fn defined(name: &str) -> bool {
+pub fn defined(name: &Ident) -> bool {
     [
         "exit",
         "rt-standard-error-port",
@@ -70,7 +71,7 @@ pub fn defined(name: &str) -> bool {
         "symbol=?",
         "type",
     ]
-    .contains(&name)
+    .contains(&name.short().as_str())
 }
 
 #[no_mangle]
