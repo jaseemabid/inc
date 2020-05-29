@@ -166,7 +166,6 @@ fn lift(s: &mut State, prog: Core) -> Vec<Core> {
                             body: code.body.into_iter().flat_map(|expr| lift(s, expr)).collect(),
                             ..code
                         };
-                        s.functions.insert(name.clone());
                         Some(Define { name, val: box Lambda(code) })
                     }
                     _ => None,
@@ -191,7 +190,6 @@ fn lift(s: &mut State, prog: Core) -> Vec<Core> {
 
         // Lift named code blocks to top level immediately, since names are manged by now.
         Define { name, val: box Lambda(code) } => {
-            s.functions.insert(name.clone());
             let body = (code).body.into_iter().map(|b| lift(s, b)).flatten().collect();
             vec![Define { name, val: box Lambda(Closure { body, ..code }) }]
         }

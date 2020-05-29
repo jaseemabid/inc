@@ -4,7 +4,7 @@
 pub mod state {
     use crate::core::Ident;
     use crate::x86::{Reference, ASM, WORDSIZE};
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
     /// State for the code generator; easier to bundle it all into a struct than
     /// pass several arguments in.
@@ -27,7 +27,6 @@ pub mod state {
         li: u64,
         pub strings: HashMap<String, usize>,
         pub symbols: HashMap<String, usize>,
-        pub functions: HashSet<Ident>,
         env: Env,
     }
 
@@ -39,7 +38,6 @@ pub mod state {
                 li: 0,
                 strings: HashMap::new(),
                 symbols: HashMap::new(),
-                functions: HashSet::new(),
                 env: Default::default(),
             }
         }
@@ -261,14 +259,12 @@ pub mod emit {
 
             List(list) => match list.as_slice() {
                 [Identifier(name), args @ ..] => {
-                    if s.functions.contains(&name) {
-                        lambda::call(s, &name, &args)
-                    } else if let Some(x) = primitives::call(s, &name, args) {
+                    if let Some(x) = primitives::call(s, &name, args) {
                         x
                     } else if rt::defined(&name) {
                         ffi::call(s, name, &args)
                     } else {
-                        panic!("Unknown function {} called with args: {:?}", name, &args)
+                        lambda::call(s, &name, &args)
                     }
                 }
                 _ => panic!("Unknown expression: `{}`", prog),
