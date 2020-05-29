@@ -8,23 +8,27 @@ use crate::{
 
 use {std::clone::Clone, std::collections::HashMap};
 
-/// Rename/mangle all references to unique names
-///
-/// The type change from Expr<String> to Expr<Ident> conveys the basic idea.
-/// Names in the source is transformed into unique identifiers with metadata.
-///
-/// This is a fairly complicated thing to get right and being able to reuse a
-/// well tested existing implementation would be great. See [RFC 2603], its
-/// [discussion] and [tracking issue] to learn how rustc does this.
-///
-/// [RFC 2603]: https://github.com/rust-lang/rfcs/blob/master/text/2603-rust-symbol-name-mangling-v0.md
-/// [discussion]: https://github.com/rust-lang/rfcs/pull/2603
-/// [tracking issue]: https://github.com/rust-lang/rust/issues/60705
-///
-pub fn rename(prog: Vec<Syntax>) -> Vec<Core> {
-    // TODO: This isn't right, same state should be used for all sub expressions.
-    // Test for 2 different functions with the same name.
+/** Rename all references to unique names.
 
+Unique **identifiers** for each variable in a program is a prerequisite for any
+program analysis. Each [String] in the source program is replaced with a fully
+qualified, globally unique [Ident] and the type change from [Expr]<[String]> to
+[Expr]<[Ident]> conveys the basic idea.
+
+* Top level definitions `(define pi 3.14)` can map to the identifiers literally as `pi`
+* Named closures and functions are namespaced with the function name `f::x` and `f::y`
+* Function **arguments** are named like local variables.
+* Unnamed bindings are indexed like`{let 0}::a`
+
+This is a fairly tricky to get right and being able to reuse a well tested
+existing implementation would be great. See [RFC 2603], its [discussion] and
+[tracking issue] to learn how rustc does this. See tests for more info
+
+[RFC 2603]: https://github.com/rust-lang/rfcs/blob/master/text/2603-rust-symbol-name-mangling-v0.md
+[discussion]: https://github.com/rust-lang/rfcs/pull/2603
+[tracking issue]: https://github.com/rust-lang/rust/issues/60705
+ **/
+pub fn rename(prog: Vec<Expr<String>>) -> Vec<Expr<Ident>> {
     prog.into_iter().map(|e| rename1(&HashMap::new(), &Ident::empty(), 0, e)).collect()
 }
 
@@ -37,11 +41,9 @@ fn rename1(env: &HashMap<&str, Ident>, base: &Ident, index: u8, prog: Syntax) ->
     match prog {
         // If an identifier is defined already, refer to it, otherwise create a
         // new one in the top level environment since its unbound.
-        Identifier(s) => match env.get(s.as_str()) {
-            Some(n) => Expr::Identifier(n.clone()),
-            None => Ident::expr(s),
-        },
-
+        Identifier(s) => {
+            env.get(s.as_str()).map_or(Ident::expr(s), |n| Expr::Identifier(n.clone()))
+        }
         Let { bindings, body } => {
             let base = base.extend(format!("{{let {}}}", index));
 
@@ -421,20 +423,6 @@ mod tests {
     }
 
     #[test]
-    fn anf() {
-        let x = parse1("(f (+ 1 2) 7)");
-        let y = Let {
-            bindings: vec![(
-                Ident::new("_0"),
-                List(vec![Ident::expr("+"), Literal(Number(1)), Literal(Number(2))]),
-            )],
-            body: vec![List(vec![Ident::expr("f"), Ident::expr("_0"), Literal(Number(7))])],
-        };
-
-        assert_eq!(y, anf1(rename(x)));
-    }
-
-    #[test]
     fn letrec() {
         let x = rename(parse1(
             "(let ((f (lambda (x) (g x x)))
@@ -468,6 +456,20 @@ mod tests {
         ));
 
         assert_eq!(x, y)
+    }
+
+    #[test]
+    fn anf() {
+        let x = parse1("(f (+ 1 2) 7)");
+        let y = Let {
+            bindings: vec![(
+                Ident::new("_0"),
+                List(vec![Ident::expr("+"), Literal(Number(1)), Literal(Number(2))]),
+            )],
+            body: vec![List(vec![Ident::expr("f"), Ident::expr("_0"), Literal(Number(7))])],
+        };
+
+        assert_eq!(y, anf1(rename(x)));
     }
 
     /// OMG! I'm so happy to finally see these tests this way! Took me years! 😢
