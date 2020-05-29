@@ -6,21 +6,16 @@ pub mod state {
     use crate::x86::{Reference, ASM, WORDSIZE};
     use std::collections::HashMap;
 
-    /// State for the code generator; easier to bundle it all into a struct than
-    /// pass several arguments in.
+    /// Shared state for the whole compiler
     ///
-    /// Stack index points to the current available empty slot. Use and then
-    /// decrement the index to add a new variable. Default to `-word size`
+    /// `si` is current available stack index. Use and then decrement the index
+    /// to allocate on stack. Defaults to `-word size`
     ///
     /// `li` is label index, a counter used to generate unique labels. See
     /// `gen_label`
     ///
-    /// `symbols` is a list of all strings known at compile time, so that they
-    /// can be allocated in the binary instead of heap.
-    ///
-    /// `functions` are all user defined functions
-    ///
-    /// State should also implement some form of register allocation.
+    /// `symbols` and `strings` are all strings known at compile time, so that
+    /// they can be allocated in the binary instead of heap.
     pub struct State {
         pub si: i64,
         pub asm: ASM,
@@ -30,8 +25,8 @@ pub mod state {
         env: Env,
     }
 
-    impl Default for State {
-        fn default() -> Self {
+    impl State {
+        pub fn new() -> Self {
             State {
                 si: -WORDSIZE,
                 asm: Default::default(),
@@ -41,9 +36,7 @@ pub mod state {
                 env: Default::default(),
             }
         }
-    }
 
-    impl State {
         pub fn enter(&mut self) {
             self.env.enter();
         }
@@ -283,7 +276,7 @@ pub mod emit {
 
     /// Top level interface to the emit module
     pub fn program(prog: Vec<Syntax>) -> String {
-        let mut s: State = Default::default();
+        let mut s = State::new();
 
         let prog = lang::analyze(&mut s, prog);
 

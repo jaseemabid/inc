@@ -359,7 +359,7 @@ mod tests {
     }
 
     fn analyze(prog: Vec<Syntax>) -> Vec<Core> {
-        super::analyze(&mut Default::default(), prog)
+        super::analyze(&mut State::new(), prog)
     }
 
     /// Mock rename, which blindly converts Strings to Identifiers
