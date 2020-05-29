@@ -1,12 +1,26 @@
-//! Scheme language transformations & idiosyncrasies
-//!
-//! Home for renaming, lifting, type checks and everything else.
-use crate::{
-    compiler::state::State,
-    core::{Expr::*, Literal::*, *},
+//! High level language analysis and transformations.
+use {
+    crate::{
+        compiler::state::State,
+        core::{Expr::*, Literal::*, *},
+    },
+    std::{clone::Clone, collections::HashMap},
 };
 
-use {std::clone::Clone, std::collections::HashMap};
+/// Perform all language transformations and analysis on the syntax tree
+///
+/// A syntax tree is renamed into unique references, lambdas lifted to top level
+/// and then program broken down into simpler ANF expressions and then tail
+/// calls are annotated with a marker.
+pub fn analyze(s: &mut State, prog: Vec<Syntax>) -> Vec<Core> {
+    prog.into_iter()
+        .flat_map(|e| {
+            let e = rename(&HashMap::new(), &Ident::empty(), 0, e);
+            let e = lift(s, e);
+            e.into_iter().map(anf).map(tco).collect::<Vec<_>>()
+        })
+        .collect()
+}
 
 /** Rename all references to unique names.
 
@@ -28,16 +42,7 @@ existing implementation would be great. See [RFC 2603], its [discussion] and
 [discussion]: https://github.com/rust-lang/rfcs/pull/2603
 [tracking issue]: https://github.com/rust-lang/rust/issues/60705
  **/
-pub fn rename(prog: Vec<Expr<String>>) -> Vec<Expr<Ident>> {
-    prog.into_iter().map(|e| rename1(&HashMap::new(), &Ident::empty(), 0, e)).collect()
-}
-
-/// Rename a single expression
-///
-/// Env maps the current environment, base is the identifier for the current
-/// environment that is used to derive all new names and index refers to the
-/// free index to name anonymous closures and let bindings.
-fn rename1(env: &HashMap<&str, Ident>, base: &Ident, index: u8, prog: Syntax) -> Core {
+fn rename(env: &HashMap<&str, Ident>, base: &Ident, index: u8, prog: Syntax) -> Core {
     match prog {
         // If an identifier is defined already, refer to it, otherwise create a
         // new one in the top level environment since its unbound.
@@ -70,12 +75,12 @@ fn rename1(env: &HashMap<&str, Ident>, base: &Ident, index: u8, prog: Syntax) ->
                         }
 
                         let value = match value {
-                            Let { .. } => rename1(&all, &base, index + 1, value.clone()),
+                            Let { .. } => rename(&all, &base, index + 1, value.clone()),
                             Lambda(c) => {
                                 let base = base.extend(current);
-                                rename1(&all, &base, index + 1, Lambda(c.clone()))
+                                rename(&all, &base, index + 1, Lambda(c.clone()))
                             }
-                            _ => rename1(&rest, &base, index + 1, value.clone()),
+                            _ => rename(&rest, &base, index + 1, value.clone()),
                         };
 
                         let ident = all.get(current.as_str()).unwrap().clone();
@@ -84,16 +89,16 @@ fn rename1(env: &HashMap<&str, Ident>, base: &Ident, index: u8, prog: Syntax) ->
                     })
                     .collect(),
 
-                body: body.into_iter().map(|b| rename1(&all, &base, index + 1, b)).collect(),
+                body: body.into_iter().map(|b| rename(&all, &base, index + 1, b)).collect(),
             }
         }
 
-        List(list) => List(list.into_iter().map(|l| rename1(env, base, index, l)).collect()),
+        List(list) => List(list.into_iter().map(|l| rename(env, base, index, l)).collect()),
 
         Cond { pred, then, alt } => Cond {
-            pred: box rename1(env, base, index, *pred),
-            then: box rename1(env, base, index, *then),
-            alt: alt.map(|u| box rename1(env, base, index, *u)),
+            pred: box rename(env, base, index, *pred),
+            then: box rename(env, base, index, *then),
+            alt: alt.map(|u| box rename(env, base, index, *u)),
         },
 
         Lambda(Closure { formals, free, body, tail }) => {
@@ -105,41 +110,30 @@ fn rename1(env: &HashMap<&str, Ident>, base: &Ident, index: u8, prog: Syntax) ->
             Lambda(Closure {
                 formals: formals.iter().map(|arg| base.extend(arg)).collect(),
                 free: free.into_iter().map(|arg| base.extend(arg)).collect(),
-                body: body.into_iter().map(|b| rename1(&env, base, 0, b)).collect(),
+                body: body.into_iter().map(|b| rename(&env, base, 0, b)).collect(),
                 tail,
             })
         }
 
         Define { name, val } => {
-            Define { name: base.extend(&name), val: box rename1(env, &base.extend(&name), 0, *val) }
+            Define { name: base.extend(&name), val: box rename(env, &base.extend(&name), 0, *val) }
         }
 
-        Vector(list) => Vector(list.into_iter().map(|l| rename1(env, base, index, l)).collect()),
+        Vector(list) => Vector(list.into_iter().map(|l| rename(env, base, index, l)).collect()),
 
         // All literals and constants evaluate to itself
         Literal(v) => Literal(v),
     }
 }
 
-/// Lift all expressions in a program.
-//
-// Each sub expression may result in multiple expressions and it gets flattened
-// at the top level. For example, a let expression binding 2 functions will
-// expand to 3 expressions.
-//
-// Some values must be lifted to the top level to ease certain stages of the
-// compiler. Actions are specific to the types - strings and symbols are added
-// to a lookup table and lambda definitions are raised to top level.
-pub fn lift(s: &mut State, prog: Vec<Core>) -> Vec<Core> {
-    prog.into_iter().flat_map(|expr| lift1(s, expr)).collect()
-}
+/// Lift all scheme lambdas to top level
+///
+/// See http://matt.might.net/articles/closure-conversion
+///
+/// TODO: Separate inlining from lifting, there is no need for them to be
+/// bundled into one function here!
 
-// Function names are guaranteed to be unique after mangling, so its safe to
-// lift *ALL* lambdas to top level.
-//
-// NOTE: ☝ this isn't currently right, because mangle doesn't cover all edge
-// cases, but lift should be able to assume so.
-fn lift1(s: &mut State, prog: Core) -> Vec<Core> {
+fn lift(s: &mut State, prog: Core) -> Vec<Core> {
     match prog {
         Literal(Str(reference)) => {
             if !s.strings.contains_key(&reference) {
@@ -161,7 +155,7 @@ fn lift1(s: &mut State, prog: Core) -> Vec<Core> {
                 .iter()
                 .filter_map(|(ident, expr)| match expr {
                     Lambda(_) => None,
-                    _ => Some((ident.clone(), shrink(lift1(s, expr.clone())))),
+                    _ => Some((ident.clone(), shrink(lift(s, expr.clone())))),
                 })
                 .collect();
 
@@ -169,7 +163,10 @@ fn lift1(s: &mut State, prog: Core) -> Vec<Core> {
                 .into_iter()
                 .filter_map(|(name, expr)| match expr {
                     Lambda(code) => {
-                        let code = Closure { body: lift(s, code.body), ..code };
+                        let code = Closure {
+                            body: code.body.into_iter().flat_map(|expr| lift(s, expr)).collect(),
+                            ..code
+                        };
                         s.functions.insert(name.clone());
                         Some(Define { name, val: box Lambda(code) })
                     }
@@ -179,24 +176,24 @@ fn lift1(s: &mut State, prog: Core) -> Vec<Core> {
 
             export.push(Let {
                 bindings: rest,
-                body: body.into_iter().map(|b| shrink(lift1(s, b))).collect(),
+                body: body.into_iter().map(|b| shrink(lift(s, b))).collect(),
             });
 
             export
         }
 
-        List(list) => vec![List(list.into_iter().map(|l| shrink(lift1(s, l))).collect())],
+        List(list) => vec![List(list.into_iter().map(|l| shrink(lift(s, l))).collect())],
 
         Cond { pred, then, alt } => vec![Cond {
-            pred: box shrink(lift1(s, *pred)),
-            then: box shrink(lift1(s, *then)),
-            alt: alt.map(|e| box shrink(lift1(s, *e))),
+            pred: box shrink(lift(s, *pred)),
+            then: box shrink(lift(s, *then)),
+            alt: alt.map(|e| box shrink(lift(s, *e))),
         }],
 
         // Lift named code blocks to top level immediately, since names are manged by now.
         Define { name, val: box Lambda(code) } => {
             s.functions.insert(name.clone());
-            let body = (code).body.into_iter().map(|b| lift1(s, b)).flatten().collect();
+            let body = (code).body.into_iter().map(|b| lift(s, b)).flatten().collect();
             vec![Define { name, val: box Lambda(Closure { body, ..code }) }]
         }
 
@@ -212,11 +209,7 @@ fn lift1(s: &mut State, prog: Core) -> Vec<Core> {
 ///
 /// The generated names are NOT guaranteed to be unique and could be a problem
 /// down the line.
-pub fn anf(prog: Vec<Core>) -> Vec<Core> {
-    prog.into_iter().map(anf1).collect()
-}
-
-fn anf1(prog: Core) -> Core {
+fn anf(prog: Core) -> Core {
     match prog {
         List(list) => {
             let (car, cdr) = list.split_at(1);
@@ -266,8 +259,8 @@ fn shrink<T: Clone>(es: Vec<Expr<T>>) -> Expr<T> {
     }
 }
 
-// Annotate tail calls with a marker
-pub fn tco(exprs: Vec<Core>) -> Vec<Core> {
+/// Annotate tail calls with a marker
+fn tco(expr: Core) -> Core {
     fn is_tail(name: &Ident, code: &Closure<Ident>) -> bool {
         // Get the expression in tail call position
         let last = code.body.last().and_then(tail);
@@ -282,31 +275,28 @@ pub fn tco(exprs: Vec<Core>) -> Vec<Core> {
         }
     }
 
-    exprs
-        .into_iter()
-        .map(|expr| match expr {
-            Define { name, val: box Lambda(code) } => Define {
-                name: name.clone(),
-                val: box Lambda(Closure { tail: is_tail(&name, &code), ..code }),
-            },
-            Let { bindings, body } => {
-                let bindings = bindings
-                    .into_iter()
-                    .map(|(name, value)| match value {
-                        Lambda(code) => {
-                            (name.clone(), Lambda(Closure { tail: is_tail(&name, &code), ..code }))
-                        }
+    match expr {
+        Define { name, val: box Lambda(code) } => Define {
+            name: name.clone(),
+            val: box Lambda(Closure { tail: is_tail(&name, &code), ..code }),
+        },
+        Let { bindings, body } => {
+            let bindings = bindings
+                .into_iter()
+                .map(|(name, value)| match value {
+                    Lambda(code) => {
+                        (name.clone(), Lambda(Closure { tail: is_tail(&name, &code), ..code }))
+                    }
 
-                        _ => (name, value),
-                    })
-                    .collect();
+                    _ => (name, value),
+                })
+                .collect();
 
-                Let { bindings, body }
-            }
+            Let { bindings, body }
+        }
 
-            e => e,
-        })
-        .collect()
+        e => e,
+    }
 }
 
 /// Return the tail position of the expression
@@ -334,11 +324,15 @@ fn tail<T: std::clone::Clone>(e: &Expr<T>) -> Option<&Expr<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::parse1;
+    use crate::parser::{parse, parse1};
     use pretty_assertions::assert_eq;
 
     fn rename(prog: Syntax) -> Core {
-        super::rename1(&HashMap::new(), &Ident::empty(), 0, prog)
+        super::rename(&HashMap::new(), &Ident::empty(), 0, prog)
+    }
+
+    fn analyze(prog: Vec<Syntax>) -> Vec<Core> {
+        super::analyze(&mut Default::default(), prog)
     }
 
     /// Mock rename, which blindly converts Strings to Identifiers
@@ -352,7 +346,7 @@ mod tests {
                     .map(|(name, value)| (Ident::new(name), mock(value.clone())))
                     .collect(),
 
-                body: body.into_iter().map(|b| mock(b)).collect(),
+                body: body.into_iter().map(mock).collect(),
             },
 
             List(list) => List(list.into_iter().map(mock).collect()),
@@ -459,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn anf() {
+    fn a_normal_form() {
         let x = parse1("(f (+ 1 2) 7)");
         let y = Let {
             bindings: vec![(
@@ -469,14 +463,14 @@ mod tests {
             body: vec![List(vec![Ident::expr("f"), Ident::expr("_0"), Literal(Number(7))])],
         };
 
-        assert_eq!(y, anf1(rename(x)));
+        assert_eq!(y, anf(rename(x)));
     }
 
     /// OMG! I'm so happy to finally see these tests this way! Took me years! 😢
     #[test]
     fn lift_simple() {
         let prog = r"(let ((id (lambda (x) x))) (id 42))";
-        let expr = lift1(&mut Default::default(), rename(parse1(prog)));
+        let expr = analyze(parse(prog).unwrap());
 
         assert_eq!(expr[0], mock(parse1("(define ({let 0}::id {let 0}::id::x ) {let 0}::id::x)")));
         assert_eq!(expr[1], mock(parse1("(let () ({let 0}::id 42))")));
@@ -488,7 +482,7 @@ mod tests {
                            (odd  (lambda (x) (if (zero? x) #f (even (dec x))))))
                        (even 25)))";
 
-        let expr = lift1(&mut Default::default(), rename(parse1(prog)));
+        let expr = lift(&mut Default::default(), rename(parse1(prog)));
 
         assert_eq!(
             expr[0],
@@ -517,18 +511,14 @@ mod tests {
                                   (factorial (dec x) (* x acc))))))
              (factorial 42 1))";
 
-        let expr = parse1(prog);
-        let expr = rename(expr);
-        let exprs = lift1(&mut Default::default(), expr);
+        let exprs = lift(&mut Default::default(), rename(parse1(prog)));
 
         match &exprs[0] {
             Define { name: _, val: box Lambda(code) } => assert_eq!(code.tail, false),
             _ => panic!(),
         };
 
-        let exprs = tco(exprs);
-
-        match &exprs[0] {
+        match tco(exprs[0].clone()) {
             Define { name: _, val: box Lambda(code) } => assert_eq!(code.tail, true),
             _ => panic!(),
         }
