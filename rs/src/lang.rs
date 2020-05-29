@@ -15,7 +15,8 @@ use {
 pub fn analyze(s: &mut State, prog: Vec<Syntax>) -> Vec<Core> {
     prog.into_iter()
         .map(|e| rename(&HashMap::new(), &Ident::empty(), 0, e))
-        .flat_map(|e| lift(s, e))
+        .flat_map(lift)
+        .map(|e| inline(s, e))
         .map(anf)
         .map(tco)
         .collect()
@@ -125,36 +126,18 @@ fn rename(env: &HashMap<&str, Ident>, base: &Ident, index: u8, prog: Syntax) -> 
     }
 }
 
-/// Lift all scheme lambdas to top level
+/// Lift all lambdas to top level
 ///
 /// See http://matt.might.net/articles/closure-conversion
-///
-/// TODO: Separate inlining from lifting, there is no need for them to be
-/// bundled into one function here!
-
-fn lift(s: &mut State, prog: Core) -> Vec<Core> {
+fn lift(prog: Core) -> Vec<Core> {
     match prog {
-        Literal(Str(reference)) => {
-            if !s.strings.contains_key(&reference) {
-                s.strings.insert(reference.clone(), s.strings.len());
-            }
-            vec![Literal(Str(reference))]
-        }
-
-        Literal(Symbol(reference)) => {
-            if !s.symbols.contains_key(&reference) {
-                s.symbols.insert(reference.clone(), s.symbols.len());
-            }
-            vec![Literal(Symbol(reference))]
-        }
-
         Let { bindings, body } => {
             // Rest is all the name bindings that are not functions
             let rest: Vec<(Ident, Core)> = bindings
                 .iter()
                 .filter_map(|(ident, expr)| match expr {
                     Lambda(_) => None,
-                    _ => Some((ident.clone(), shrink(lift(s, expr.clone())))),
+                    _ => Some((ident.clone(), shrink(lift(expr.clone())))),
                 })
                 .collect();
 
@@ -163,7 +146,7 @@ fn lift(s: &mut State, prog: Core) -> Vec<Core> {
                 .filter_map(|(name, expr)| match expr {
                     Lambda(code) => {
                         let code = Closure {
-                            body: code.body.into_iter().flat_map(|expr| lift(s, expr)).collect(),
+                            body: code.body.into_iter().flat_map(lift).collect(),
                             ..code
                         };
                         Some(Define { name, val: box Lambda(code) })
@@ -174,29 +157,87 @@ fn lift(s: &mut State, prog: Core) -> Vec<Core> {
 
             export.push(Let {
                 bindings: rest,
-                body: body.into_iter().map(|b| shrink(lift(s, b))).collect(),
+                body: body.into_iter().map(|b| shrink(lift(b))).collect(),
             });
 
             export
         }
 
-        List(list) => vec![List(list.into_iter().map(|l| shrink(lift(s, l))).collect())],
+        List(list) => vec![List(list.into_iter().map(|l| shrink(lift(l))).collect())],
 
         Cond { pred, then, alt } => vec![Cond {
-            pred: box shrink(lift(s, *pred)),
-            then: box shrink(lift(s, *then)),
-            alt: alt.map(|e| box shrink(lift(s, *e))),
+            pred: box shrink(lift(*pred)),
+            then: box shrink(lift(*then)),
+            alt: alt.map(|e| box shrink(lift(*e))),
         }],
 
         // Lift named code blocks to top level immediately, since names are manged by now.
         Define { name, val: box Lambda(code) } => {
-            let body = (code).body.into_iter().map(|b| lift(s, b)).flatten().collect();
+            let body = (code).body.into_iter().flat_map(lift).collect();
             vec![Define { name, val: box Lambda(Closure { body, ..code }) }]
         }
 
         // Am unnamed literal lambda must be in an inline calling position
         // Lambda(Closure { .. }) => unimplemented!("inline λ"),
         e => vec![e],
+    }
+}
+// Shrink a vector of expressions into a single expression
+//
+// TODO: Replace with `(begin ...)`, list really isn't the same thing
+fn shrink<T: Clone>(es: Vec<Expr<T>>) -> Expr<T> {
+    match es.len() {
+        0 => Literal(Nil),
+        1 => es[0].clone(),
+        _ => List(es),
+    }
+}
+
+/// Inline all references to strings and symbols
+fn inline(s: &mut State, prog: Core) -> Core {
+    match prog {
+        Literal(l) => {
+            match &l {
+                Str(reference) => {
+                    let index = s.strings.len();
+                    s.strings.entry(reference.clone()).or_insert(index);
+                }
+
+                Symbol(reference) => {
+                    let index = s.symbols.len();
+                    s.symbols.entry(reference.clone()).or_insert(index);
+                }
+
+                _ => {}
+            };
+
+            Literal(l)
+        }
+
+        Let { bindings, body } => Let {
+            bindings: bindings.into_iter().map(|(ident, expr)| (ident, inline(s, expr))).collect(),
+            body: body.into_iter().map(|b| inline(s, b)).collect(),
+        },
+
+        List(list) => List(list.into_iter().map(|e| inline(s, e)).collect()),
+
+        Vector(list) => Vector(list.into_iter().map(|e| inline(s, e)).collect()),
+
+        Cond { pred, then, alt } => Cond {
+            pred: box inline(s, *pred),
+            then: box inline(s, *then),
+            alt: alt.map(|e| box inline(s, *e)),
+        },
+
+        Define { name, val: box Lambda(code) } => Define {
+            name,
+            val: box Lambda(Closure {
+                body: code.body.into_iter().map(|e| inline(s, e)).collect(),
+                ..code
+            }),
+        },
+
+        e => e,
     }
 }
 
@@ -242,17 +283,6 @@ fn anf(prog: Core) -> Core {
             }
         }
         e => e,
-    }
-}
-
-// Shrink a vector of expressions into a single expression
-//
-// TODO: Replace with `(begin ...)`, list really isn't the same thing
-fn shrink<T: Clone>(es: Vec<Expr<T>>) -> Expr<T> {
-    match es.len() {
-        0 => Literal(Nil),
-        1 => es[0].clone(),
-        _ => List(es),
     }
 }
 
@@ -479,7 +509,7 @@ mod tests {
                            (odd  (lambda (x) (if (zero? x) #f (even (dec x))))))
                        (even 25)))";
 
-        let expr = lift(&mut Default::default(), rename(parse1(prog)));
+        let expr = lift(rename(parse1(prog)));
 
         assert_eq!(
             expr[0],
@@ -508,7 +538,7 @@ mod tests {
                                   (factorial (dec x) (* x acc))))))
              (factorial 42 1))";
 
-        let exprs = lift(&mut Default::default(), rename(parse1(prog)));
+        let exprs = lift(rename(parse1(prog)));
 
         match &exprs[0] {
             Define { name: _, val: box Lambda(code) } => assert_eq!(code.tail, false),
