@@ -14,11 +14,10 @@ use {
 /// calls are annotated with a marker.
 pub fn analyze(s: &mut State, prog: Vec<Syntax>) -> Vec<Core> {
     prog.into_iter()
-        .flat_map(|e| {
-            let e = rename(&HashMap::new(), &Ident::empty(), 0, e);
-            let e = lift(s, e);
-            e.into_iter().map(anf).map(tco).collect::<Vec<_>>()
-        })
+        .map(|e| rename(&HashMap::new(), &Ident::empty(), 0, e))
+        .flat_map(|e| lift(s, e))
+        .map(anf)
+        .map(tco)
         .collect()
 }
 
